@@ -49,6 +49,14 @@ export default function AddRecipePage() {
         servings: Array.isArray(extractedRecipe.servings)
           ? extractedRecipe.servings[extractedRecipe.servings.length - 1]
           : extractedRecipe.servings,
+        // Ensure all ingredients have both rawText and ingredient fields
+        ingredients: extractedRecipe.ingredients.map(ing => ({
+          ...ing,
+          rawText: ing.rawText || ing.ingredient || '',
+          ingredient: ing.ingredient || ing.rawText || ''
+        })),
+        // Filter out any empty instructions
+        instructions: extractedRecipe.instructions.filter(inst => inst && inst.trim())
       };
 
       const response = await recipes.create(recipeData);
@@ -65,7 +73,13 @@ export default function AddRecipePage() {
 
   const handleIngredientChange = (index, field, value) => {
     const newIngredients = [...extractedRecipe.ingredients];
-    newIngredients[index] = { ...newIngredients[index], [field]: value };
+    // Update both rawText and ingredient fields to satisfy backend validation
+    newIngredients[index] = {
+      ...newIngredients[index],
+      [field]: value,
+      // If updating rawText, also update ingredient field
+      ...(field === 'rawText' ? { ingredient: value } : {})
+    };
     setExtractedRecipe({ ...extractedRecipe, ingredients: newIngredients });
   };
 
