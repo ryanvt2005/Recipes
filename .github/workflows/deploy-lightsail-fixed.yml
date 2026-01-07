@@ -1,0 +1,169 @@
+name: Deploy to Lightsail (Fixed)
+
+on:
+  push:
+    branches:
+      - claude/recipe-app-backend-UoTAm
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Lightsail
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify Secrets
+        run: |
+          echo "Checking secrets are set..."
+          if [ -z "${{ secrets.LIGHTSAIL_IP }}" ]; then
+            echo "❌ LIGHTSAIL_IP secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.LIGHTSAIL_SSH_KEY }}" ]; then
+            echo "❌ LIGHTSAIL_SSH_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            echo "❌ ANTHROPIC_API_KEY secret is not set"
+            exit 1
+          fi
+          echo "✅ All secrets are set"
+
+      - name: Setup SSH
+        env:
+          LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$LIGHTSAIL_SSH_KEY" > ~/.ssh/lightsail_key
+          chmod 600 ~/.ssh/lightsail_key
+
+          # Test SSH key format
+          if ! ssh-keygen -l -f ~/.ssh/lightsail_key; then
+            echo "❌ SSH key is invalid or corrupted"
+            exit 1
+          fi
+
+          # Add host to known_hosts
+          ssh-keyscan -H $LIGHTSAIL_IP >> ~/.ssh/known_hosts 2>/dev/null
+
+          echo "✅ SSH configured successfully"
+
+      - name: Test SSH Connection
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+        run: |
+          echo "Testing SSH connection..."
+          ssh -i ~/.ssh/lightsail_key -o ConnectTimeout=10 ec2-user@$LIGHTSAIL_IP "echo '✅ SSH connection successful'" || {
+            echo "❌ SSH connection failed"
+            echo "Troubleshooting tips:"
+            echo "1. Verify LIGHTSAIL_IP is correct"
+            echo "2. Verify SSH key matches your Lightsail instance"
+            echo "3. Download key from: Lightsail Console → Account → SSH Keys"
+            echo "4. Copy ENTIRE contents including BEGIN/END lines"
+            exit 1
+          }
+
+      - name: Deploy Application
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          ssh -i ~/.ssh/lightsail_key ec2-user@$LIGHTSAIL_IP bash << 'ENDSSH'
+          set -e
+
+          echo "📦 Deploying Recipe App..."
+
+          # Navigate to repo
+          cd ~/Recipes || {
+            echo "❌ Recipes directory not found. Please run initial setup first."
+            exit 1
+          }
+
+          # Pull latest code
+          echo "📥 Pulling latest code..."
+          git fetch origin
+          git checkout claude/recipe-app-backend-UoTAm
+          git pull origin claude/recipe-app-backend-UoTAm
+
+          # Create .env file
+          echo "⚙️  Updating configuration..."
+          cat > .env << EOF
+          DB_NAME=recipeapp
+          DB_USER=recipeuser
+          DB_PASSWORD=$DB_PASSWORD
+          JWT_SECRET=$JWT_SECRET
+          ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+          NODE_ENV=production
+          FRONTEND_URL=http://localhost:3001
+          EOF
+
+          # Stop existing containers
+          echo "🛑 Stopping existing containers..."
+          docker-compose down || true
+
+          # Build and start containers
+          echo "🐳 Starting Docker containers..."
+          docker-compose up -d --build
+
+          # Wait for database
+          echo "⏳ Waiting for database to be ready..."
+          sleep 15
+
+          # Run migrations
+          echo "📊 Running database migrations..."
+          docker-compose exec -T backend npm run migrate || {
+            echo "⚠️  Migration failed, checking if tables already exist..."
+            docker-compose exec -T backend npm run migrate || true
+          }
+
+          # Check container status
+          echo "📋 Container status:"
+          docker-compose ps
+
+          # Check backend logs
+          echo "📝 Recent backend logs:"
+          docker-compose logs --tail=20 backend
+
+          echo "✅ Deployment complete!"
+          ENDSSH
+
+      - name: Health Check
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+        run: |
+          echo "🏥 Running health check..."
+          sleep 5
+
+          for i in {1..5}; do
+            if curl -f -s http://$LIGHTSAIL_IP:3000/health; then
+              echo ""
+              echo "✅ Health check passed!"
+              echo "🌐 API is live at: http://$LIGHTSAIL_IP:3000"
+              exit 0
+            fi
+            echo "Attempt $i/5 failed, retrying..."
+            sleep 5
+          done
+
+          echo "⚠️ Health check failed after 5 attempts"
+          echo "The deployment may still be starting up. Check manually:"
+          echo "http://$LIGHTSAIL_IP:3000/health"
+          exit 1
+
+      - name: Deployment Summary
+        if: always()
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+        run: |
+          echo "📊 Deployment Summary"
+          echo "===================="
+          echo "Branch: claude/recipe-app-backend-UoTAm"
+          echo "Instance IP: $LIGHTSAIL_IP"
+          echo "API URL: http://$LIGHTSAIL_IP:3000"
+          echo "Health: http://$LIGHTSAIL_IP:3000/health"
