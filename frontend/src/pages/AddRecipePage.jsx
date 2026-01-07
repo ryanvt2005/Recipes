@@ -22,7 +22,14 @@ export default function AddRecipePage() {
 
     try {
       const response = await recipes.extract(url);
-      setExtractedRecipe(response.data.recipe);
+      const recipe = response.data.recipe;
+
+      // Normalize servings if it's an array
+      if (Array.isArray(recipe.servings)) {
+        recipe.servings = recipe.servings[recipe.servings.length - 1];
+      }
+
+      setExtractedRecipe(recipe);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to extract recipe from URL');
     } finally {
@@ -35,7 +42,16 @@ export default function AddRecipePage() {
     setError('');
 
     try {
-      const response = await recipes.create(extractedRecipe);
+      // Normalize recipe data before sending
+      const recipeData = {
+        ...extractedRecipe,
+        // Convert servings array to string if needed
+        servings: Array.isArray(extractedRecipe.servings)
+          ? extractedRecipe.servings[extractedRecipe.servings.length - 1]
+          : extractedRecipe.servings,
+      };
+
+      const response = await recipes.create(recipeData);
       navigate(`/recipes/${response.data.recipe.id}`);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save recipe');
