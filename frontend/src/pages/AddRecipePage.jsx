@@ -50,14 +50,22 @@ export default function AddRecipePage() {
           ? extractedRecipe.servings[extractedRecipe.servings.length - 1]
           : extractedRecipe.servings,
         // Ensure all ingredients have both rawText and ingredient fields
-        ingredients: extractedRecipe.ingredients.map(ing => ({
-          ...ing,
-          rawText: ing.rawText || ing.ingredient || '',
-          ingredient: ing.ingredient || ing.rawText || ''
-        })),
+        // Remove sortOrder field as it's not allowed by validation
+        ingredients: extractedRecipe.ingredients.map(ing => {
+          const { sortOrder, ...rest } = ing; // Remove sortOrder
+          return {
+            ...rest,
+            rawText: rest.rawText || rest.ingredient || '',
+            ingredient: rest.ingredient || rest.rawText || ''
+          };
+        }),
         // Filter out any empty instructions
         instructions: extractedRecipe.instructions.filter(inst => inst && inst.trim())
       };
+
+      // Remove fields that aren't allowed by backend validation
+      delete recipeData.cached;
+      delete recipeData.extractionMethod;
 
       const response = await recipes.create(recipeData);
       navigate(`/recipes/${response.data.recipe.id}`);
