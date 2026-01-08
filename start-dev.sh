@@ -22,6 +22,20 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
+# Detect docker-compose command (v1 vs v2)
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE="docker compose"
+else
+    echo "❌ Error: docker-compose not found."
+    echo "   Install it with: sudo apt-get install docker-compose-plugin"
+    exit 1
+fi
+
+echo "Using: $DOCKER_COMPOSE"
+echo ""
+
 # Check if .env file exists
 if [ ! -f ".env" ]; then
     echo "⚠️  .env file not found!"
@@ -57,7 +71,7 @@ fi
 
 # Start backend and database
 echo "🐳 Starting backend and database..."
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+$DOCKER_COMPOSE -f docker-compose.yml -f docker-compose.dev.yml up -d
 
 echo ""
 echo "⏳ Waiting for services to start (15 seconds)..."
@@ -72,9 +86,9 @@ if echo "$HEALTH" | grep -q "healthy"; then
     echo "✅ Backend is healthy!"
 else
     echo "⚠️  Backend might not be ready yet. Checking logs..."
-    docker-compose logs --tail=20 backend
+    $DOCKER_COMPOSE logs --tail=20 backend
     echo ""
-    echo "If you see errors above, fix them and run: docker-compose restart backend"
+    echo "If you see errors above, fix them and run: $DOCKER_COMPOSE restart backend"
 fi
 
 echo ""
@@ -86,10 +100,10 @@ echo "Backend API: http://localhost:3000"
 echo "Health Check: http://localhost:3000/health"
 echo ""
 echo "📋 View backend logs:"
-echo "   docker-compose logs -f backend"
+echo "   $DOCKER_COMPOSE logs -f backend"
 echo ""
 echo "🗄️  Access database:"
-echo "   docker-compose exec db psql -U recipeuser -d recipeapp"
+echo "   $DOCKER_COMPOSE exec db psql -U recipeuser -d recipeapp"
 echo ""
 echo "----------------------------------------"
 echo ""
@@ -103,5 +117,5 @@ echo ""
 echo "----------------------------------------"
 echo ""
 echo "To stop the backend:"
-echo "   docker-compose down"
+echo "   $DOCKER_COMPOSE down"
 echo ""
