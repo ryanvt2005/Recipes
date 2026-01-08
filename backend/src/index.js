@@ -5,6 +5,7 @@ const helmet = require('helmet');
 const logger = require('./config/logger');
 const authRoutes = require('./routes/authRoutes');
 const recipeRoutes = require('./routes/recipeRoutes');
+const shoppingListRoutes = require('./routes/shoppingListRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -57,6 +58,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/recipes', recipeRoutes);
+app.use('/api/v1/shopping-lists', shoppingListRoutes);
 
 // 404 handler
 app.use((req, res) => {

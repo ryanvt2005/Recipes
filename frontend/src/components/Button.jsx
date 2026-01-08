@@ -12,6 +12,7 @@ export default function Button({
     primary: 'btn-primary',
     secondary: 'btn-secondary',
     outline: 'btn-outline',
+    danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
   };
 
   return (

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { recipes } from '../services/api';
+import { Link, useNavigate } from 'react-router-dom';
+import { recipes, shoppingLists } from '../services/api';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
@@ -12,6 +12,12 @@ export default function RecipesPage() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState(null);
+  const [selectedRecipes, setSelectedRecipes] = useState([]);
+  const [showShoppingListModal, setShowShoppingListModal] = useState(false);
+  const [shoppingListName, setShoppingListName] = useState('');
+  const [creatingList, setCreatingList] = useState(false);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchRecipes();
@@ -40,6 +46,45 @@ export default function RecipesPage() {
     e.preventDefault();
     setPage(1);
     fetchRecipes();
+  };
+
+  const toggleRecipeSelection = (recipeId) => {
+    setSelectedRecipes(prev =>
+      prev.includes(recipeId)
+        ? prev.filter(id => id !== recipeId)
+        : [...prev, recipeId]
+    );
+  };
+
+  const handleCreateShoppingList = () => {
+    if (selectedRecipes.length === 0) {
+      setError('Please select at least one recipe');
+      return;
+    }
+    setShoppingListName('My Shopping List');
+    setShowShoppingListModal(true);
+  };
+
+  const handleConfirmCreateShoppingList = async () => {
+    if (!shoppingListName.trim()) {
+      setError('Please enter a shopping list name');
+      return;
+    }
+
+    try {
+      setCreatingList(true);
+      setError('');
+      const response = await shoppingLists.createFromRecipes(selectedRecipes, shoppingListName);
+      setShowShoppingListModal(false);
+      setSelectedRecipes([]);
+      setShoppingListName('');
+      // Navigate to the shopping list view
+      navigate(`/shopping-lists/${response.data.shoppingList.id}`);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to create shopping list');
+    } finally {
+      setCreatingList(false);
+    }
   };
 
   return (
@@ -108,22 +153,32 @@ export default function RecipesPage() {
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {recipeList.map((recipe) => (
-                <Link
-                  key={recipe.id}
-                  to={`/recipes/${recipe.id}`}
-                  className="recipe-card"
-                >
-                  {recipe.imageUrl && (
-                    <img
-                      src={recipe.imageUrl}
-                      alt={recipe.title}
-                      className="w-full h-48 object-cover"
+                <div key={recipe.id} className="recipe-card relative">
+                  {/* Selection checkbox */}
+                  <div className="absolute top-2 left-2 z-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedRecipes.includes(recipe.id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        toggleRecipeSelection(recipe.id);
+                      }}
+                      className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                     />
-                  )}
-                  <div className="p-4">
-                    <h3 className="font-semibold text-lg mb-2 line-clamp-2">
-                      {recipe.title}
-                    </h3>
+                  </div>
+
+                  <Link to={`/recipes/${recipe.id}`} className="block">
+                    {recipe.imageUrl && (
+                      <img
+                        src={recipe.imageUrl}
+                        alt={recipe.title}
+                        className="w-full h-48 object-cover"
+                      />
+                    )}
+                    <div className="p-4">
+                      <h3 className="font-semibold text-lg mb-2 line-clamp-2">
+                        {recipe.title}
+                      </h3>
                     {recipe.description && (
                       <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                         {recipe.description}
@@ -159,8 +214,9 @@ export default function RecipesPage() {
                         ))}
                       </div>
                     )}
-                  </div>
-                </Link>
+                    </div>
+                  </Link>
+                </div>
               ))}
             </div>
 
@@ -187,6 +243,69 @@ export default function RecipesPage() {
               </div>
             )}
           </>
+        )}
+
+        {/* Floating Action Button for Shopping List */}
+        {selectedRecipes.length > 0 && (
+          <div className="fixed bottom-6 right-6 z-50">
+            <Button
+              onClick={handleCreateShoppingList}
+              className="shadow-lg flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              Add {selectedRecipes.length} to Shopping List
+            </Button>
+          </div>
+        )}
+
+        {/* Shopping List Modal */}
+        {showShoppingListModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <h2 className="text-xl font-bold mb-4">Create Shopping List</h2>
+              <p className="text-gray-600 mb-4">
+                Creating a shopping list from {selectedRecipes.length} selected recipe{selectedRecipes.length > 1 ? 's' : ''}.
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Shopping List Name
+                </label>
+                <input
+                  type="text"
+                  value={shoppingListName}
+                  onChange={(e) => setShoppingListName(e.target.value)}
+                  className="input w-full"
+                  placeholder="e.g., Weekly Groceries"
+                  autoFocus
+                />
+              </div>
+              {error && (
+                <div className="rounded-md bg-red-50 p-3 mb-4">
+                  <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setShowShoppingListModal(false);
+                    setError('');
+                  }}
+                  disabled={creatingList}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmCreateShoppingList}
+                  loading={creatingList}
+                >
+                  Create Shopping List
+                </Button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </Layout>
