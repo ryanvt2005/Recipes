@@ -213,7 +213,12 @@ async function createFromRecipes(req, res) {
     });
 
   } catch (error) {
-    logger.error('Error creating shopping list from recipes', { error: error.message });
+    logger.error('Error creating shopping list from recipes', {
+      error: error.message,
+      stack: error.stack,
+      userId,
+      recipeIds
+    });
     res.status(500).json({ error: 'Failed to create shopping list' });
   }
 }
