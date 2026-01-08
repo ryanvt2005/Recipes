@@ -213,6 +213,13 @@ async function createFromRecipes(req, res) {
     });
 
   } catch (error) {
+    console.error('=== SHOPPING LIST ERROR ===');
+    console.error('Message:', error.message);
+    console.error('Stack:', error.stack);
+    console.error('User ID:', userId);
+    console.error('Recipe IDs:', recipeIds);
+    console.error('===========================');
+
     logger.error('Error creating shopping list from recipes', {
       error: error.message,
       stack: error.stack,
