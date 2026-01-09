@@ -153,11 +153,11 @@ async function createFromRecipes(req, res) {
 
     // Get all ingredients from selected recipes
     const ingredientsResult = await pool.query(
-      `SELECT ri.raw_text, ri.quantity, ri.unit, ri.ingredient
-       FROM recipe_ingredients ri
-       INNER JOIN recipes r ON ri.recipe_id = r.id
+      `SELECT i.raw_text, i.quantity, i.unit, i.ingredient
+       FROM ingredients i
+       INNER JOIN recipes r ON i.recipe_id = r.id
        WHERE r.id = ANY($1) AND r.user_id = $2
-       ORDER BY ri.sort_order`,
+       ORDER BY i.sort_order`,
       [recipeIds, userId]
     );
 
