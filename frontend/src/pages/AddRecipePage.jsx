@@ -7,6 +7,7 @@ import Button from '../components/Button';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 export default function AddRecipePage() {
+  const [mode, setMode] = useState('extract'); // 'extract' or 'manual'
   const [url, setUrl] = useState('');
   const [extracting, setExtracting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -14,6 +15,20 @@ export default function AddRecipePage() {
   const [extractedRecipe, setExtractedRecipe] = useState(null);
 
   const navigate = useNavigate();
+
+  const handleStartManual = () => {
+    setExtractedRecipe({
+      title: '',
+      description: '',
+      prepTime: '',
+      cookTime: '',
+      servings: '',
+      imageUrl: '',
+      ingredients: [{ rawText: '', ingredient: '' }],
+      instructions: ['']
+    });
+    setMode('manual');
+  };
 
   const handleExtract = async (e) => {
     e.preventDefault();
@@ -97,13 +112,68 @@ export default function AddRecipePage() {
     setExtractedRecipe({ ...extractedRecipe, instructions: newInstructions });
   };
 
+  const addIngredient = () => {
+    setExtractedRecipe({
+      ...extractedRecipe,
+      ingredients: [...extractedRecipe.ingredients, { rawText: '', ingredient: '' }]
+    });
+  };
+
+  const removeIngredient = (index) => {
+    const newIngredients = extractedRecipe.ingredients.filter((_, i) => i !== index);
+    setExtractedRecipe({ ...extractedRecipe, ingredients: newIngredients });
+  };
+
+  const addInstruction = () => {
+    setExtractedRecipe({
+      ...extractedRecipe,
+      instructions: [...extractedRecipe.instructions, '']
+    });
+  };
+
+  const removeInstruction = (index) => {
+    const newInstructions = extractedRecipe.instructions.filter((_, i) => i !== index);
+    setExtractedRecipe({ ...extractedRecipe, instructions: newInstructions });
+  };
+
   return (
     <Layout>
       <div className="max-w-4xl mx-auto space-y-6">
         <h1 className="text-3xl font-bold text-gray-900">Add Recipe</h1>
 
-        {/* URL Extraction */}
+        {/* Mode Selection */}
         {!extractedRecipe && (
+          <div className="card">
+            <h2 className="text-xl font-semibold mb-4">How would you like to add your recipe?</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <button
+                onClick={() => setMode('extract')}
+                className={`p-6 border-2 rounded-lg text-left hover:border-primary-500 transition ${
+                  mode === 'extract' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
+                }`}
+              >
+                <div className="text-lg font-semibold mb-2">📎 Extract from URL</div>
+                <p className="text-sm text-gray-600">
+                  Automatically extract recipe details from a website URL
+                </p>
+              </button>
+              <button
+                onClick={handleStartManual}
+                className={`p-6 border-2 rounded-lg text-left hover:border-primary-500 transition ${
+                  mode === 'manual' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
+                }`}
+              >
+                <div className="text-lg font-semibold mb-2">✏️ Enter Manually</div>
+                <p className="text-sm text-gray-600">
+                  Type in your recipe details by hand
+                </p>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* URL Extraction */}
+        {!extractedRecipe && mode === 'extract' && (
           <div className="card">
             <h2 className="text-xl font-semibold mb-4">Extract from URL</h2>
             <p className="text-gray-600 mb-4">
@@ -205,7 +275,12 @@ export default function AddRecipePage() {
 
             {/* Ingredients */}
             <div className="card">
-              <h3 className="text-lg font-semibold mb-4">Ingredients</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Ingredients</h3>
+                <Button variant="secondary" onClick={addIngredient}>
+                  + Add Ingredient
+                </Button>
+              </div>
               <div className="space-y-3">
                 {extractedRecipe.ingredients.map((ingredient, index) => (
                   <div key={index} className="flex gap-2">
@@ -215,6 +290,15 @@ export default function AddRecipePage() {
                       placeholder="e.g., 2 cups flour"
                       className="flex-1"
                     />
+                    {extractedRecipe.ingredients.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeIngredient(index)}
+                        className="text-red-600 hover:text-red-800 px-2"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -222,7 +306,12 @@ export default function AddRecipePage() {
 
             {/* Instructions */}
             <div className="card">
-              <h3 className="text-lg font-semibold mb-4">Instructions</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Instructions</h3>
+                <Button variant="secondary" onClick={addInstruction}>
+                  + Add Step
+                </Button>
+              </div>
               <div className="space-y-3">
                 {extractedRecipe.instructions.map((instruction, index) => (
                   <div key={index} className="flex gap-2">
@@ -232,7 +321,17 @@ export default function AddRecipePage() {
                       onChange={(e) => handleInstructionChange(index, e.target.value)}
                       rows={2}
                       className="input flex-1"
+                      placeholder={`Step ${index + 1}`}
                     />
+                    {extractedRecipe.instructions.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeInstruction(index)}
+                        className="text-red-600 hover:text-red-800 px-2"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

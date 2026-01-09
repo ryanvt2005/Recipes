@@ -35,6 +35,12 @@ export default function Layout({ children }) {
                   >
                     Add Recipe
                   </Link>
+                  <Link
+                    to="/shopping-lists"
+                    className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Shopping Lists
+                  </Link>
 
                   <Menu as="div" className="relative">
                     <Menu.Button className="flex items-center text-gray-700 hover:text-primary-600">

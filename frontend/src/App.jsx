@@ -7,6 +7,7 @@ import RegisterPage from './pages/RegisterPage';
 import RecipesPage from './pages/RecipesPage';
 import RecipeDetailPage from './pages/RecipeDetailPage';
 import AddRecipePage from './pages/AddRecipePage';
+import ShoppingListsPage from './pages/ShoppingListsPage';
 import ShoppingListPage from './pages/ShoppingListPage';
 
 function App() {
@@ -41,6 +42,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <RecipeDetailPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/shopping-lists"
+            element={
+              <ProtectedRoute>
+                <ShoppingListsPage />
               </ProtectedRoute>
             }
           />
