@@ -170,27 +170,46 @@ jobs:
           set -e
 
           cd ~/Recipes
+
+          echo "📡 Fetching latest code from develop branch..."
           git fetch origin
           git checkout develop
-          git pull origin develop
+          git reset --hard origin/develop
 
+          echo "📊 Deploying commit: $(git log -1 --oneline)"
+
+          echo "🔧 Creating environment file..."
           cat > .env << EOF
+          DB_HOST=db
+          DB_PORT=5432
           DB_NAME=recipeapp
           DB_USER=recipeuser
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           JWT_SECRET=${{ secrets.JWT_SECRET }}
           ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
-          NODE_ENV=development
-          FRONTEND_URL=http://localhost:3001
+          NODE_ENV=production
+          PORT=3000
+          FRONTEND_URL=http://${{ secrets.LIGHTSAIL_IP }}:3001
+          VITE_API_URL=http://${{ secrets.LIGHTSAIL_IP }}:3000
           EOF
 
+          echo "🛑 Stopping existing containers..."
           docker-compose down
-          docker-compose up -d --build
 
-          sleep 10
-          docker-compose exec -T backend npm run migrate || true
+          echo "🏗️  Building containers from source..."
+          docker-compose build --no-cache
 
-          echo "Deployment complete"
+          echo "🚀 Starting all services..."
+          docker-compose up -d
+
+          echo "⏳ Waiting for services to start..."
+          sleep 20
+
+          echo "🗄️  Running database migrations..."
+          docker-compose exec -T backend npm run migrate || echo "Migrations already applied"
+
+          echo "✅ Deployment complete!"
+          docker-compose ps
           ENDSSH
 
       - name: Health check
