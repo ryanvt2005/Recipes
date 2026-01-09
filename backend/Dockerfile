@@ -1,18 +1,48 @@
-FROM node:20-alpine
-
+# Base stage
+FROM node:20-alpine AS base
 WORKDIR /app
-
-# Copy package files
 COPY package*.json ./
 
-# Install dependencies (including dev dependencies for local development)
+# Development stage
+FROM base AS development
 RUN npm ci
+COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
+# Production dependencies stage
+FROM base AS prod-deps
+RUN npm ci --only=production
+
+# Production build stage
+FROM base AS production
+RUN npm ci
+COPY . .
+# Add any build steps here if needed
+RUN npm prune --production
+
+# Final production stage
+FROM node:20-alpine AS prod
+WORKDIR /app
+
+# Copy production dependencies
+COPY --from=prod-deps /app/node_modules ./node_modules
 
 # Copy application code
-COPY . .
+COPY --from=production /app/package*.json ./
+COPY --from=production /app/src ./src
 
-# Expose port
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001 && \
+    chown -R nodejs:nodejs /app
+
+USER nodejs
+
 EXPOSE 3000
 
-# Start application
-CMD ["npm", "start"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+CMD ["node", "src/index.js"]

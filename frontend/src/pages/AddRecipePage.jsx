@@ -67,7 +67,7 @@ export default function AddRecipePage() {
         // Ensure all ingredients have both rawText and ingredient fields
         // Remove sortOrder field as it's not allowed by validation
         ingredients: extractedRecipe.ingredients.map(ing => {
-          const { sortOrder, ...rest } = ing; // Remove sortOrder
+          const { sortOrder, ...rest } = ing; // eslint-disable-line no-unused-vars
           return {
             ...rest,
             rawText: rest.rawText || rest.ingredient || '',

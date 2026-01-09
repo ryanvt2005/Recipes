@@ -5,9 +5,9 @@ A full-stack web application for saving, organizing, and planning meals from rec
 ## Features
 
 - **Smart Recipe Extraction**: Automatically extract recipes from any URL using schema.org markup or Claude AI as fallback
+- **Manual Recipe Entry**: Add your own recipes with a user-friendly form
 - **Recipe Management**: Save, edit, delete, and search your recipe collection
-- **Meal Planning**: Plan weekly meals with a calendar interface (coming soon)
-- **Shopping Lists**: Generate consolidated grocery lists from meal plans (coming soon)
+- **Shopping Lists**: Generate and manage consolidated grocery lists from recipes
 - **User Authentication**: Secure JWT-based authentication system
 
 ## Tech Stack
@@ -20,17 +20,45 @@ A full-stack web application for saving, organizing, and planning meals from rec
 - **Authentication**: JWT with bcrypt
 - **Validation**: Joi
 
-### Frontend (Coming Soon)
-- React 18+
-- Tailwind CSS
-- React Router
+### Frontend
+- **Framework**: React 18+
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **Routing**: React Router
+- **State Management**: Zustand
+- **Forms**: React Hook Form
+- **UI Components**: Headless UI
 
 ## Getting Started
 
+### Quick Start with Docker (Recommended)
+
+The fastest way to get started:
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd Recipes
+
+# Copy environment file and configure
+cp .env.example .env
+# Edit .env with your API keys
+
+# Start everything with Docker Compose
+docker-compose up -d
+
+# Run database migrations
+docker-compose exec backend npm run migrate
+
+# Access the application
+# Frontend: http://localhost:3001
+# Backend API: http://localhost:3000
+```
+
 ### Prerequisites
 
-- Node.js 20 or higher
-- PostgreSQL 15 or higher
+- Docker and Docker Compose (recommended)
+- OR Node.js 20+ and PostgreSQL 15+ (for manual setup)
 - Anthropic API key ([Get one here](https://console.anthropic.com/))
 
 ### Installation
@@ -233,12 +261,43 @@ The application uses PostgreSQL with the following main tables:
 - `meal_plans`: Weekly meal planning (coming soon)
 - `shopping_lists`: Generated grocery lists (coming soon)
 
+## Documentation
+
+- [Development Guide](docs/DEVELOPMENT.md) - Setup, architecture, and contributing
+- [Deployment Guide](docs/DEPLOYMENT.md) - Deployment instructions for all environments
+
 ## Development
 
-### Running tests
+### Quick Development Setup
+
+```bash
+# Start with hot-reload enabled
+./start-dev.sh
+
+# Or manually
+docker-compose -f docker-compose.yml -f docker-compose.dev.yml up
+```
+
+### Code Quality
+
+```bash
+# Backend linting and formatting
+cd backend
+npm run lint
+npm run format
+
+# Frontend linting and formatting
+cd frontend
+npm run lint
+npm run format
+```
+
+### Running Tests
+
 ```bash
 cd backend
-npm test
+npm test              # Run all tests
+npm run test:watch   # Run in watch mode
 ```
 
 ### Project Structure
@@ -305,13 +364,16 @@ Recipes/
 - [x] Backend API with authentication
 - [x] Recipe extraction (schema.org + LLM)
 - [x] Recipe CRUD operations
-- [ ] Meal planning endpoints
-- [ ] Shopping list generation
-- [ ] Frontend React application
-- [ ] Drag-and-drop meal planning UI
+- [x] Manual recipe entry
+- [x] Shopping list generation and management
+- [x] Frontend React application
+- [x] Ingredient consolidation in shopping lists
+- [ ] Meal planning calendar
+- [ ] Recipe sharing and collaboration
 - [ ] Mobile apps (iOS/Android)
 - [ ] Recipe import from PDF
 - [ ] Nutritional information
+- [ ] Recipe collections and folders
 
 ## Contributing
 

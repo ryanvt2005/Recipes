@@ -18,7 +18,10 @@ services:
 
   backend:
     image: recipe-app-backend:latest
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: prod
     container_name: recipe-app-backend
     environment:
       DB_HOST: db

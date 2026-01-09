@@ -126,7 +126,7 @@ async function fetchHtml(url) {
  * Extract image URL from schema.org image field
  */
 function extractImageUrl(imageField) {
-  if (!imageField) return null;
+  if (!imageField) {return null;}
 
   if (typeof imageField === 'string') {
     return imageField;
@@ -147,10 +147,10 @@ function extractImageUrl(imageField) {
  * Parse ISO 8601 duration to human-readable format
  */
 function parseDuration(duration) {
-  if (!duration || typeof duration !== 'string') return null;
+  if (!duration || typeof duration !== 'string') {return null;}
 
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
-  if (!match) return duration;
+  if (!match) {return duration;}
 
   const hours = parseInt(match[1] || 0);
   const minutes = parseInt(match[2] || 0);
@@ -170,7 +170,7 @@ function parseDuration(duration) {
  * Parse schema.org ingredients (can be strings or objects)
  */
 function parseSchemaIngredients(ingredients) {
-  if (!Array.isArray(ingredients)) return [];
+  if (!Array.isArray(ingredients)) {return [];}
 
   return ingredients.map((ingredient, index) => {
     if (typeof ingredient === 'string') {
@@ -239,7 +239,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
  * Parse quantity (handles fractions)
  */
 function parseQuantity(quantityStr) {
-  if (!quantityStr) return null;
+  if (!quantityStr) {return null;}
 
   // Handle fractions like "1/2"
   if (quantityStr.includes('/')) {
@@ -267,7 +267,7 @@ function extractRecipeFromSchema(html) {
         (Array.isArray(item['@type']) && item['@type'].includes('Recipe'))
       );
 
-      if (!recipeData) continue;
+      if (!recipeData) {continue;}
 
       // Validate required fields
       if (!recipeData.name || !recipeData.recipeIngredient || !recipeData.recipeInstructions) {

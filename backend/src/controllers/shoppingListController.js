@@ -6,7 +6,7 @@ const logger = require('../config/logger');
  * Handles fractions like "1/2", "1 1/2", decimals, and ranges
  */
 function parseQuantity(quantityStr) {
-  if (!quantityStr) return null;
+  if (!quantityStr) {return null;}
 
   // Remove extra whitespace
   quantityStr = quantityStr.trim();
@@ -39,7 +39,7 @@ function parseQuantity(quantityStr) {
  * Normalize unit names to standard forms
  */
 function normalizeUnit(unit) {
-  if (!unit) return null;
+  if (!unit) {return null;}
 
   const unitMap = {
     // Volume

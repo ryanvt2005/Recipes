@@ -147,7 +147,7 @@ export default function ShoppingListsPage() {
           <ul className="text-sm text-blue-800 space-y-1">
             <li>• Go to your Recipes page</li>
             <li>• Select recipes using the checkboxes</li>
-            <li>• Click "Create Shopping List" to generate a consolidated list</li>
+            <li>• Click &quot;Create Shopping List&quot; to generate a consolidated list</li>
             <li>• Ingredients from multiple recipes are automatically combined</li>
           </ul>
         </div>
