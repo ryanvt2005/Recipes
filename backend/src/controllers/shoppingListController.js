@@ -81,7 +81,29 @@ function normalizeUnit(unit) {
 /**
  * Parse ingredient text to extract quantity, unit, and name
  */
-function parseIngredient(rawText) {
+function parseIngredient(rawText, ingredientName) {
+  // If we have ingredient_name from database, use it; otherwise parse rawText
+  if (ingredientName) {
+    // Try to extract quantity and unit from rawText
+    const pattern = /^(\d+\/\d+|\d+\s+\d+\/\d+|\d+\.?\d*|\d+-\d+)?\s*([a-zA-Z]+)?\s+/;
+    const match = rawText.match(pattern);
+
+    if (match) {
+      return {
+        quantity: parseQuantity(match[1]),
+        unit: normalizeUnit(match[2]),
+        name: ingredientName.trim().toLowerCase()
+      };
+    }
+
+    return {
+      quantity: null,
+      unit: null,
+      name: ingredientName.trim().toLowerCase()
+    };
+  }
+
+  // Fallback: parse from rawText
   const pattern = /^(\d+\/\d+|\d+\s+\d+\/\d+|\d+\.?\d*|\d+-\d+)?\s*([a-zA-Z]+)?\s+(.+)$/;
   const match = rawText.match(pattern);
 
@@ -109,7 +131,7 @@ function consolidateIngredients(recipeIngredients) {
   const consolidated = {};
 
   recipeIngredients.forEach(ing => {
-    const parsed = parseIngredient(ing.rawText || ing.ingredient);
+    const parsed = parseIngredient(ing.raw_text, ing.ingredient_name);
 
     // Create a key based on ingredient name and unit
     const key = `${parsed.name}|${parsed.unit || 'none'}`;
@@ -153,7 +175,7 @@ async function createFromRecipes(req, res) {
 
     // Get all ingredients from selected recipes
     const ingredientsResult = await pool.query(
-      `SELECT i.raw_text, i.quantity, i.unit, i.ingredient
+      `SELECT i.raw_text, i.quantity, i.unit, i.ingredient_name
        FROM ingredients i
        INNER JOIN recipes r ON i.recipe_id = r.id
        WHERE r.id = ANY($1) AND r.user_id = $2
