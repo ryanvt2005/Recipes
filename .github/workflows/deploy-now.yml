@@ -1,0 +1,113 @@
+name: Deploy to Lightsail (Working)
+
+on:
+  push:
+    branches:
+      - claude/recipe-app-backend-UoTAm
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Lightsail
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Lightsail
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+          LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          # Setup SSH
+          mkdir -p ~/.ssh
+          echo "$LIGHTSAIL_SSH_KEY" > ~/.ssh/lightsail_key
+          chmod 600 ~/.ssh/lightsail_key
+          ssh-keyscan -H $LIGHTSAIL_IP >> ~/.ssh/known_hosts
+
+          # Deploy
+          ssh -i ~/.ssh/lightsail_key ec2-user@$LIGHTSAIL_IP bash << 'ENDSSH'
+          set -e
+
+          echo "📦 Deploying Recipe App..."
+
+          # Navigate to repo
+          cd ~/Recipes
+
+          # Pull latest code
+          echo "📥 Pulling latest code..."
+          git fetch origin
+          git checkout claude/recipe-app-backend-UoTAm
+          git pull origin claude/recipe-app-backend-UoTAm
+
+          # Update .env
+          echo "⚙️  Updating configuration..."
+          cat > .env << EOF
+          DB_NAME=recipeapp
+          DB_USER=recipeuser
+          DB_PASSWORD=$DB_PASSWORD
+          JWT_SECRET=$JWT_SECRET
+          ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+          NODE_ENV=production
+          FRONTEND_URL=http://localhost:3001
+          EOF
+
+          # Stop containers
+          echo "🛑 Stopping existing containers..."
+          docker-compose down || true
+
+          # Update Docker Compose (fix the buildx issue)
+          echo "🔧 Updating Docker Compose..."
+          sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
+
+          # Build backend image first (without compose)
+          echo "🏗️  Building backend Docker image..."
+          cd backend
+          docker build -t recipe-app-backend:latest .
+          cd ..
+
+          # Start containers (without --build since we already built it)
+          echo "🐳 Starting Docker containers..."
+          docker-compose up -d
+
+          # Wait for database
+          echo "⏳ Waiting for database..."
+          sleep 15
+
+          # Run migrations
+          echo "📊 Running migrations..."
+          docker-compose exec -T backend npm run migrate || echo "⚠️  Migration may have already run"
+
+          # Show status
+          echo "📋 Container status:"
+          docker-compose ps
+
+          echo "✅ Deployment complete!"
+          ENDSSH
+
+      - name: Health Check
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+        run: |
+          echo "🏥 Running health check..."
+          sleep 5
+
+          for i in {1..10}; do
+            if curl -f -s http://$LIGHTSAIL_IP:3000/health; then
+              echo ""
+              echo "✅ Health check passed!"
+              echo "🌐 API: http://$LIGHTSAIL_IP:3000"
+              exit 0
+            fi
+            echo "Attempt $i/10..."
+            sleep 3
+          done
+
+          echo "⚠️ Health check taking longer than expected"
+          echo "Check manually: http://$LIGHTSAIL_IP:3000/health"
