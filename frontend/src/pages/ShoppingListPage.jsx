@@ -58,8 +58,11 @@ export default function ShoppingListPage() {
   const formatQuantity = (quantity, unit) => {
     if (!quantity) return '';
 
+    // Convert to number (quantity comes from DB as string for DECIMAL type)
+    const qty = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
+
     // Format quantity nicely
-    const formatted = quantity % 1 === 0 ? quantity.toString() : quantity.toFixed(2);
+    const formatted = qty % 1 === 0 ? qty.toString() : qty.toFixed(2);
 
     return unit ? `${formatted} ${unit}` : formatted;
   };
