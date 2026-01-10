@@ -10,6 +10,7 @@ export default function ShoppingListPage() {
   const navigate = useNavigate();
   const [shoppingList, setShoppingList] = useState(null);
   const [items, setItems] = useState([]);
+  const [recipes, setRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -23,6 +24,7 @@ export default function ShoppingListPage() {
       const response = await shoppingLists.getOne(id);
       setShoppingList(response.data.shoppingList);
       setItems(response.data.items);
+      setRecipes(response.data.recipes || []);
     } catch (err) {
       setError('Failed to load shopping list');
     } finally {
@@ -122,24 +124,27 @@ export default function ShoppingListPage() {
 
   return (
     <Layout>
-      <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{shoppingList?.name}</h1>
-            <p className="text-gray-600 mt-1">
-              {checkedCount} of {totalCount} items checked
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Link to="/recipes">
-              <Button variant="secondary">Back to Recipes</Button>
-            </Link>
-            <Button variant="danger" onClick={handleDelete}>
-              Delete List
-            </Button>
-          </div>
-        </div>
+      <div className="max-w-7xl mx-auto">
+        <div className="flex gap-6">
+          {/* Main Content */}
+          <div className="flex-1 space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">{shoppingList?.name}</h1>
+                <p className="text-gray-600 mt-1">
+                  {checkedCount} of {totalCount} items checked
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Link to="/recipes">
+                  <Button variant="secondary">Back to Recipes</Button>
+                </Link>
+                <Button variant="danger" onClick={handleDelete}>
+                  Delete List
+                </Button>
+              </div>
+            </div>
 
         {error && (
           <div className="rounded-md bg-red-50 p-4">
@@ -232,15 +237,57 @@ export default function ShoppingListPage() {
           )}
         </div>
 
-        {/* Tips */}
-        <div className="card bg-blue-50 border-blue-200">
-          <h3 className="font-semibold text-blue-900 mb-2">💡 Tips</h3>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• Items are organized by grocery store category for easier shopping</li>
-            <li>• Check off items as you shop to track your progress</li>
-            <li>• Ingredients from multiple recipes have been combined</li>
-            <li>• Similar ingredients with the same unit are consolidated</li>
-          </ul>
+            {/* Tips */}
+            <div className="card bg-blue-50 border-blue-200">
+              <h3 className="font-semibold text-blue-900 mb-2">💡 Tips</h3>
+              <ul className="text-sm text-blue-800 space-y-1">
+                <li>• Items are organized by grocery store category for easier shopping</li>
+                <li>• Check off items as you shop to track your progress</li>
+                <li>• Ingredients from multiple recipes have been combined</li>
+                <li>• Similar ingredients with the same unit are consolidated</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Sidebar - Recipes */}
+          {recipes.length > 0 && (
+            <div className="w-80 flex-shrink-0">
+              <div className="sticky top-6">
+                <div className="card">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Recipes in this list</h3>
+                  <div className="space-y-3">
+                    {recipes.map((recipe) => (
+                      <Link
+                        key={recipe.id}
+                        to={`/recipes/${recipe.id}`}
+                        className="block group"
+                      >
+                        <div className="flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                          {recipe.image_url && (
+                            <img
+                              src={recipe.image_url}
+                              alt={recipe.title}
+                              className="w-16 h-16 object-cover rounded flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2">
+                              {recipe.title}
+                            </h4>
+                            {recipe.scaled_servings && (
+                              <p className="text-sm text-gray-500 mt-1">
+                                Scaled to {recipe.scaled_servings} servings
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </Layout>

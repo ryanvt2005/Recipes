@@ -259,6 +259,19 @@ async function createFromRecipes(req, res) {
     const itemResults = await Promise.all(itemPromises);
     const items = itemResults.map(r => r.rows[0]);
 
+    // Track which recipes were included in this shopping list
+    const recipeAssociationPromises = recipeData.map(recipe => {
+      return pool.query(
+        `INSERT INTO shopping_list_recipes
+         (shopping_list_id, recipe_id, scaled_servings)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (shopping_list_id, recipe_id) DO NOTHING`,
+        [shoppingList.id, recipe.recipeId, recipe.scaledServings]
+      );
+    });
+
+    await Promise.all(recipeAssociationPromises);
+
     logger.info('Shopping list created', {
       userId,
       listId: shoppingList.id,
@@ -341,9 +354,20 @@ async function getShoppingList(req, res) {
       [id]
     );
 
+    // Get associated recipes
+    const recipesResult = await pool.query(
+      `SELECT r.id, r.title, r.image_url, slr.scaled_servings, slr.added_at
+       FROM shopping_list_recipes slr
+       INNER JOIN recipes r ON slr.recipe_id = r.id
+       WHERE slr.shopping_list_id = $1
+       ORDER BY slr.added_at`,
+      [id]
+    );
+
     res.json({
       shoppingList: listResult.rows[0],
-      items: itemsResult.rows
+      items: itemsResult.rows,
+      recipes: recipesResult.rows
     });
 
   } catch (error) {
@@ -560,6 +584,19 @@ async function addRecipesToList(req, res) {
     });
 
     await Promise.all(updatePromises);
+
+    // Track which recipes were added to this shopping list
+    const recipeAssociationPromises = recipeData.map(recipe => {
+      return pool.query(
+        `INSERT INTO shopping_list_recipes
+         (shopping_list_id, recipe_id, scaled_servings)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (shopping_list_id, recipe_id) DO NOTHING`,
+        [listId, recipe.recipeId, recipe.scaledServings]
+      );
+    });
+
+    await Promise.all(recipeAssociationPromises);
 
     // Get updated shopping list
     const updatedItemsResult = await pool.query(
