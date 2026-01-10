@@ -59,9 +59,9 @@ export default function ShoppingListSelectorModal({ isOpen, onClose, onConfirm, 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] overflow-y-auto">
-        <div className="p-6">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClose}>
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <div className="p-6 overflow-y-auto flex-1">
           <h2 className="text-2xl font-bold mb-4">Add to Shopping List</h2>
 
           {error && (
@@ -135,8 +135,11 @@ export default function ShoppingListSelectorModal({ isOpen, onClose, onConfirm, 
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="flex gap-3 mt-6">
+        </div>
+
+        {/* Action Buttons - Fixed at bottom */}
+        <div className="p-6 pt-0 border-t bg-gray-50 rounded-b-lg">
+          <div className="flex gap-3">
             <Button
               variant="secondary"
               onClick={handleClose}
