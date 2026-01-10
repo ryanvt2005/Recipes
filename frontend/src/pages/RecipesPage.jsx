@@ -4,6 +4,7 @@ import { recipes, shoppingLists } from '../services/api';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
+import ShoppingListSelectorModal from '../components/ShoppingListSelectorModal';
 
 export default function RecipesPage() {
   const [recipeList, setRecipeList] = useState([]);
@@ -14,7 +15,6 @@ export default function RecipesPage() {
   const [pagination, setPagination] = useState(null);
   const [selectedRecipes, setSelectedRecipes] = useState([]);
   const [showShoppingListModal, setShowShoppingListModal] = useState(false);
-  const [shoppingListName, setShoppingListName] = useState('');
   const [creatingList, setCreatingList] = useState(false);
 
   const navigate = useNavigate();
@@ -61,28 +61,28 @@ export default function RecipesPage() {
       setError('Please select at least one recipe');
       return;
     }
-    setShoppingListName('My Shopping List');
     setShowShoppingListModal(true);
   };
 
-  const handleConfirmCreateShoppingList = async () => {
-    if (!shoppingListName.trim()) {
-      setError('Please enter a shopping list name');
-      return;
-    }
-
+  const handleListSelection = async (selection) => {
     try {
       setCreatingList(true);
-      setError('');
-      const response = await shoppingLists.createFromRecipes(selectedRecipes, shoppingListName);
       setShowShoppingListModal(false);
+      setError('');
+
+      if (selection.isNewList) {
+        // Create new shopping list
+        const response = await shoppingLists.createFromRecipes(selectedRecipes, selection.listName);
+        navigate(`/shopping-lists/${response.data.shoppingList.id}`);
+      } else {
+        // Add to existing shopping list
+        await shoppingLists.addRecipesToList(selection.listId, selectedRecipes);
+        navigate(`/shopping-lists/${selection.listId}`);
+      }
+
       setSelectedRecipes([]);
-      setShoppingListName('');
-      // Navigate to the shopping list view
-      navigate(`/shopping-lists/${response.data.shoppingList.id}`);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to create shopping list');
-    } finally {
+      setError(err.response?.data?.message || 'Failed to add to shopping list');
       setCreatingList(false);
     }
   };
@@ -261,52 +261,14 @@ export default function RecipesPage() {
         )}
 
         {/* Shopping List Modal */}
-        {showShoppingListModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <h2 className="text-xl font-bold mb-4">Create Shopping List</h2>
-              <p className="text-gray-600 mb-4">
-                Creating a shopping list from {selectedRecipes.length} selected recipe{selectedRecipes.length > 1 ? 's' : ''}.
-              </p>
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Shopping List Name
-                </label>
-                <input
-                  type="text"
-                  value={shoppingListName}
-                  onChange={(e) => setShoppingListName(e.target.value)}
-                  className="input w-full"
-                  placeholder="e.g., Weekly Groceries"
-                  autoFocus
-                />
-              </div>
-              {error && (
-                <div className="rounded-md bg-red-50 p-3 mb-4">
-                  <p className="text-sm text-red-800">{error}</p>
-                </div>
-              )}
-              <div className="flex gap-3 justify-end">
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    setShowShoppingListModal(false);
-                    setError('');
-                  }}
-                  disabled={creatingList}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleConfirmCreateShoppingList}
-                  loading={creatingList}
-                >
-                  Create Shopping List
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ShoppingListSelectorModal
+          isOpen={showShoppingListModal}
+          onClose={() => setShowShoppingListModal(false)}
+          onConfirm={handleListSelection}
+          recipeData={{
+            defaultName: `Shopping List (${selectedRecipes.length} recipe${selectedRecipes.length > 1 ? 's' : ''})`
+          }}
+        />
       </div>
     </Layout>
   );

@@ -15,6 +15,9 @@ router.get('/', shoppingListController.getUserShoppingLists);
 // Get a specific shopping list with items
 router.get('/:id', shoppingListController.getShoppingList);
 
+// Add recipes to an existing shopping list
+router.post('/:id/add-recipes', shoppingListController.addRecipesToList);
+
 // Update shopping list item (check/uncheck, add notes)
 router.patch('/items/:id', shoppingListController.updateItem);
 

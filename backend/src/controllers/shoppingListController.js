@@ -416,10 +416,181 @@ async function deleteShoppingList(req, res) {
   }
 }
 
+/**
+ * Add recipes to an existing shopping list
+ */
+async function addRecipesToList(req, res) {
+  const userId = req.user.userId;
+  const listId = req.params.id;
+  const { recipeIds } = req.body;
+
+  try {
+    // Validate input
+    if (!recipeIds || !Array.isArray(recipeIds) || recipeIds.length === 0) {
+      return res.status(400).json({ error: 'recipeIds array is required' });
+    }
+
+    // Verify shopping list exists and belongs to user
+    const listResult = await pool.query(
+      'SELECT id, name FROM shopping_lists WHERE id = $1 AND user_id = $2',
+      [listId, userId]
+    );
+
+    if (listResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Shopping list not found' });
+    }
+
+    // Parse recipeIds - support both string array and object array
+    const recipeData = recipeIds.map(item => {
+      if (typeof item === 'string') {
+        return { recipeId: item, scaledServings: null };
+      }
+      return { recipeId: item.recipeId, scaledServings: item.scaledServings || null };
+    });
+
+    const justIds = recipeData.map(r => r.recipeId);
+
+    // Get ingredients AND original servings
+    const ingredientsResult = await pool.query(
+      `SELECT i.raw_text, i.quantity, i.unit, i.ingredient_name, i.recipe_id, r.servings as recipe_servings
+       FROM ingredients i
+       INNER JOIN recipes r ON i.recipe_id = r.id
+       WHERE r.id = ANY($1) AND r.user_id = $2
+       ORDER BY i.sort_order`,
+      [justIds, userId]
+    );
+
+    if (ingredientsResult.rows.length === 0) {
+      return res.status(404).json({ error: 'No ingredients found for selected recipes' });
+    }
+
+    // Scale ingredients if needed
+    const scaledIngredients = ingredientsResult.rows.map(ingredient => {
+      const recipeInfo = recipeData.find(r => r.recipeId === ingredient.recipe_id);
+
+      if (!recipeInfo || !recipeInfo.scaledServings) {
+        return ingredient;
+      }
+
+      const { parseServings } = require('../utils/recipeScaling');
+      const originalServings = parseServings(ingredient.recipe_servings);
+
+      if (!originalServings) {
+        return ingredient;
+      }
+
+      const scaleFactor = recipeInfo.scaledServings / originalServings;
+
+      return {
+        ...ingredient,
+        quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity
+      };
+    });
+
+    // Get existing items from the shopping list
+    const existingItemsResult = await pool.query(
+      `SELECT * FROM shopping_list_items WHERE shopping_list_id = $1`,
+      [listId]
+    );
+
+    const existingItems = existingItemsResult.rows;
+    const newIngredients = consolidateIngredients(scaledIngredients);
+
+    // Merge with existing items
+    const mergedItems = {};
+
+    // Add existing items to merged
+    existingItems.forEach(item => {
+      const key = `${item.ingredient_name}|${item.unit || 'none'}`;
+      mergedItems[key] = {
+        id: item.id,
+        ingredient_name: item.ingredient_name,
+        quantity: item.quantity,
+        unit: item.unit,
+        category: item.category,
+        existing: true
+      };
+    });
+
+    // Add or merge new ingredients
+    newIngredients.forEach(ing => {
+      const key = `${ing.ingredient_name}|${ing.unit || 'none'}`;
+
+      if (mergedItems[key]) {
+        // Update existing item quantity
+        if (ing.quantity !== null && mergedItems[key].quantity !== null) {
+          mergedItems[key].quantity += ing.quantity;
+        } else if (ing.quantity !== null) {
+          mergedItems[key].quantity = ing.quantity;
+        }
+      } else {
+        // Add new item
+        mergedItems[key] = {
+          ingredient_name: ing.ingredient_name,
+          quantity: ing.quantity,
+          unit: ing.unit,
+          category: ing.category,
+          existing: false
+        };
+      }
+    });
+
+    // Update or insert items
+    const updatePromises = Object.values(mergedItems).map(async (item) => {
+      if (item.existing) {
+        // Update existing item
+        return pool.query(
+          `UPDATE shopping_list_items
+           SET quantity = $1
+           WHERE id = $2
+           RETURNING *`,
+          [item.quantity, item.id]
+        );
+      } else {
+        // Insert new item
+        return pool.query(
+          `INSERT INTO shopping_list_items
+           (shopping_list_id, ingredient_name, quantity, unit, category)
+           VALUES ($1, $2, $3, $4, $5)
+           RETURNING *`,
+          [listId, item.ingredient_name, item.quantity, item.unit, item.category]
+        );
+      }
+    });
+
+    await Promise.all(updatePromises);
+
+    // Get updated shopping list
+    const updatedItemsResult = await pool.query(
+      `SELECT * FROM shopping_list_items
+       WHERE shopping_list_id = $1
+       ORDER BY sort_order, ingredient_name`,
+      [listId]
+    );
+
+    logger.info('Recipes added to shopping list', {
+      userId,
+      listId,
+      recipeCount: recipeIds.length
+    });
+
+    res.status(200).json({
+      shoppingList: listResult.rows[0],
+      items: updatedItemsResult.rows,
+      message: 'Recipes added to shopping list successfully'
+    });
+
+  } catch (error) {
+    logger.error('Error adding recipes to shopping list', { error: error.message });
+    res.status(500).json({ error: 'Failed to add recipes to shopping list' });
+  }
+}
+
 module.exports = {
   createFromRecipes,
   getUserShoppingLists,
   getShoppingList,
   updateItem,
-  deleteShoppingList
+  deleteShoppingList,
+  addRecipesToList
 };

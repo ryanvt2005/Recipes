@@ -4,6 +4,7 @@ import { recipes, shoppingLists } from '../services/api';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
+import ShoppingListSelectorModal from '../components/ShoppingListSelectorModal';
 import { MinusIcon, PlusIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 
 export default function RecipeDetailPage() {
@@ -17,6 +18,7 @@ export default function RecipeDetailPage() {
   const [currentServings, setCurrentServings] = useState(null);
   const [scalingError, setScalingError] = useState('');
   const [creatingList, setCreatingList] = useState(false);
+  const [showListModal, setShowListModal] = useState(false);
 
   useEffect(() => {
     fetchRecipe();
@@ -180,10 +182,16 @@ export default function RecipeDetailPage() {
     }
   };
 
-  // Create shopping list with current (possibly scaled) servings
-  const handleCreateShoppingList = async () => {
+  // Show modal to select shopping list
+  const handleAddToShoppingList = () => {
+    setShowListModal(true);
+  };
+
+  // Handle shopping list selection from modal
+  const handleListSelection = async (selection) => {
     try {
       setCreatingList(true);
+      setShowListModal(false);
       setError('');
 
       // Prepare recipe data with scaled servings if applicable
@@ -192,16 +200,17 @@ export default function RecipeDetailPage() {
         scaledServings: recipe.isScaled ? currentServings : null
       };
 
-      const listName = recipe.isScaled
-        ? `${recipe.title} (${currentServings} servings)`
-        : recipe.title;
-
-      const response = await shoppingLists.createFromRecipes([recipeData], listName);
-
-      // Navigate to the new shopping list
-      navigate(`/shopping-lists/${response.data.shoppingList.id}`);
+      if (selection.isNewList) {
+        // Create new shopping list
+        const response = await shoppingLists.createFromRecipes([recipeData], selection.listName);
+        navigate(`/shopping-lists/${response.data.shoppingList.id}`);
+      } else {
+        // Add to existing shopping list
+        const response = await shoppingLists.addRecipesToList(selection.listId, [recipeData]);
+        navigate(`/shopping-lists/${selection.listId}`);
+      }
     } catch (err) {
-      setError('Failed to create shopping list');
+      setError('Failed to add to shopping list');
       setCreatingList(false);
     }
   };
@@ -231,6 +240,17 @@ export default function RecipeDetailPage() {
 
   return (
     <Layout>
+      <ShoppingListSelectorModal
+        isOpen={showListModal}
+        onClose={() => setShowListModal(false)}
+        onConfirm={handleListSelection}
+        recipeData={{
+          defaultName: recipe.isScaled
+            ? `${recipe.title} (${currentServings} servings)`
+            : recipe.title
+        }}
+      />
+
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
@@ -258,7 +278,7 @@ export default function RecipeDetailPage() {
           </div>
           <div className="flex gap-2">
             <Button
-              onClick={handleCreateShoppingList}
+              onClick={handleAddToShoppingList}
               loading={creatingList}
               className="flex items-center gap-2"
             >
