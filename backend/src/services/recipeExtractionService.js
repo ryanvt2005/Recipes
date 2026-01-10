@@ -105,15 +105,26 @@ async function fetchHtml(url) {
   try {
     const response = await axios.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Upgrade-Insecure-Requests': '1'
       },
-      timeout: 10000,
-      maxRedirects: 5
+      timeout: 15000,
+      maxRedirects: 5,
+      validateStatus: (status) => status >= 200 && status < 400
     });
 
     return response.data;
   } catch (error) {
-    logger.error('Failed to fetch URL', { url, error: error.message });
+    logger.error('Failed to fetch URL', { url, error: error.message, status: error.response?.status });
     throw new RecipeExtractionError(
       'Could not fetch the webpage',
       'URL_FETCH_FAILED',
@@ -167,23 +178,49 @@ function parseDuration(duration) {
 }
 
 /**
- * Parse schema.org ingredients (can be strings or objects)
+ * Parse schema.org ingredients (can be strings, objects, or HowToSection objects)
  */
 function parseSchemaIngredients(ingredients) {
   if (!Array.isArray(ingredients)) {return [];}
 
-  return ingredients.map((ingredient, index) => {
-    if (typeof ingredient === 'string') {
-      return parseIngredientString(ingredient, index);
-    } else if (typeof ingredient === 'object' && ingredient.text) {
-      return parseIngredientString(ingredient.text, index);
+  const parsed = [];
+  let sortOrder = 0;
+  let currentGroup = null;
+
+  ingredients.forEach((ingredient) => {
+    // Handle HowToSection for grouped ingredients
+    if (typeof ingredient === 'object' && ingredient['@type'] === 'HowToSection') {
+      currentGroup = ingredient.name || null;
+      if (Array.isArray(ingredient.itemListElement)) {
+        ingredient.itemListElement.forEach(item => {
+          const text = typeof item === 'string' ? item : (item.text || item.name);
+          if (text) {
+            const parsedIng = parseIngredientString(text, sortOrder++);
+            parsedIng.group = currentGroup;
+            parsed.push(parsedIng);
+          }
+        });
+      }
     }
-    return null;
-  }).filter(Boolean);
+    // Handle plain string
+    else if (typeof ingredient === 'string') {
+      const parsedIng = parseIngredientString(ingredient, sortOrder++);
+      parsedIng.group = currentGroup;
+      parsed.push(parsedIng);
+    }
+    // Handle object with text property
+    else if (typeof ingredient === 'object' && ingredient.text) {
+      const parsedIng = parseIngredientString(ingredient.text, sortOrder++);
+      parsedIng.group = currentGroup;
+      parsed.push(parsedIng);
+    }
+  });
+
+  return parsed;
 }
 
 /**
- * Parse schema.org instructions (can be strings or HowToStep objects)
+ * Parse schema.org instructions (can be strings, HowToStep objects, or HowToSection objects)
  */
 function parseSchemaInstructions(instructions) {
   if (!Array.isArray(instructions)) {
@@ -193,14 +230,34 @@ function parseSchemaInstructions(instructions) {
     return [];
   }
 
-  return instructions.map(instruction => {
+  const parsed = [];
+
+  instructions.forEach(instruction => {
+    // Handle plain string
     if (typeof instruction === 'string') {
-      return instruction;
-    } else if (typeof instruction === 'object') {
-      return instruction.text || instruction.description || null;
+      parsed.push(instruction);
     }
-    return null;
-  }).filter(Boolean);
+    // Handle HowToSection (contains multiple steps)
+    else if (typeof instruction === 'object' && instruction['@type'] === 'HowToSection') {
+      if (Array.isArray(instruction.itemListElement)) {
+        instruction.itemListElement.forEach(step => {
+          const text = typeof step === 'string' ? step : (step.text || step.description);
+          if (text) {
+            parsed.push(text);
+          }
+        });
+      }
+    }
+    // Handle HowToStep or other objects
+    else if (typeof instruction === 'object') {
+      const text = instruction.text || instruction.description;
+      if (text) {
+        parsed.push(text);
+      }
+    }
+  });
+
+  return parsed;
 }
 
 /**
