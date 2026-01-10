@@ -93,6 +93,19 @@ export default function RecipeDetailPage() {
     }
   };
 
+  // Get original servings for multiplier buttons
+  const getOriginalServings = () => {
+    return parseServings(originalRecipe?.servings);
+  };
+
+  // Handle multiplier button click (1x, 2x, 3x)
+  const handleMultiplier = (multiplier) => {
+    const originalServings = getOriginalServings();
+    if (originalServings) {
+      handleScaleRecipe(originalServings * multiplier);
+    }
+  };
+
   // Format ingredient quantity for display
   const formatQuantity = (ingredient) => {
     if (!ingredient.quantity) {
@@ -330,37 +343,61 @@ export default function RecipeDetailPage() {
         {/* Recipe Scaling */}
         {currentServings && (
           <div className="card mb-8 bg-gradient-to-r from-primary-50 to-blue-50">
-            <h3 className="text-lg font-semibold mb-3 text-gray-900">Adjust Servings</h3>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={decreaseServings}
-                disabled={currentServings <= 1}
-                className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title="Decrease servings"
-              >
-                <MinusIcon className="w-5 h-5 text-gray-700" />
-              </button>
-              <div className="text-center min-w-[120px]">
-                <div className="text-3xl font-bold text-primary-700">{currentServings}</div>
-                <div className="text-sm text-gray-600">servings</div>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-medium text-gray-700">Servings:</span>
+                <button
+                  onClick={decreaseServings}
+                  disabled={currentServings <= 1}
+                  className="p-1 rounded bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Decrease servings"
+                >
+                  <MinusIcon className="w-4 h-4 text-gray-700" />
+                </button>
+                <div className="text-center min-w-[60px]">
+                  <div className="text-xl font-bold text-primary-700">{currentServings}</div>
+                </div>
+                <button
+                  onClick={increaseServings}
+                  className="p-1 rounded bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
+                  title="Increase servings"
+                >
+                  <PlusIcon className="w-4 h-4 text-gray-700" />
+                </button>
               </div>
-              <button
-                onClick={increaseServings}
-                className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
-                title="Increase servings"
-              >
-                <PlusIcon className="w-5 h-5 text-gray-700" />
-              </button>
+
+              {/* Quick multiplier buttons */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 mr-1">Quick:</span>
+                {[1, 2, 3].map((multiplier) => {
+                  const originalServings = getOriginalServings();
+                  const targetServings = originalServings * multiplier;
+                  const isActive = currentServings === targetServings;
+
+                  return (
+                    <button
+                      key={multiplier}
+                      onClick={() => handleMultiplier(multiplier)}
+                      className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                        isActive
+                          ? 'bg-primary-600 text-white'
+                          : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                      }`}
+                      title={`${multiplier}× original (${targetServings} servings)`}
+                    >
+                      {multiplier}×
+                    </button>
+                  );
+                })}
+              </div>
 
               {recipe.isScaled && (
-                <div className="ml-4 flex items-center gap-3">
-                  <span className="text-sm text-gray-600">
-                    Scaled from {recipe.originalServings} servings (×{recipe.scaleFactor.toFixed(2)})
-                  </span>
-                  <Button variant="secondary" size="sm" onClick={handleResetScale}>
-                    Reset to Original
-                  </Button>
-                </div>
+                <button
+                  onClick={handleResetScale}
+                  className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  Reset
+                </button>
               )}
             </div>
 
@@ -371,7 +408,7 @@ export default function RecipeDetailPage() {
             )}
 
             {recipe.isScaled && (
-              <div className="mt-4 text-sm text-blue-800 bg-blue-100 p-3 rounded-lg">
+              <div className="mt-3 text-xs text-blue-800 bg-blue-100 p-2 rounded-lg">
                 💡 <strong>Tip:</strong> Ingredient quantities have been automatically adjusted. Scaled amounts are shown in <span className="font-semibold text-primary-700">bold</span> with original amounts in gray.
               </div>
             )}
