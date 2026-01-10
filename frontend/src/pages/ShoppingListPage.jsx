@@ -44,6 +44,18 @@ export default function ShoppingListPage() {
     }
   };
 
+  const updateItemCategory = async (itemId, newCategory) => {
+    try {
+      await shoppingLists.updateItem(itemId, { category: newCategory });
+      // Update local state
+      setItems(items.map(item =>
+        item.id === itemId ? { ...item, category: newCategory } : item
+      ));
+    } catch (err) {
+      setError('Failed to update category');
+    }
+  };
+
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this shopping list?')) {
       return;
@@ -213,9 +225,21 @@ export default function ShoppingListPage() {
                           onChange={() => toggleItemChecked(item.id, item.is_checked)}
                           className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
                         />
-                        <div className="flex-1">
-                          <div className={`font-medium ${item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                            {item.ingredient_name}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className={`font-medium flex-1 ${item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                              {item.ingredient_name}
+                            </div>
+                            <select
+                              value={item.category || 'Other'}
+                              onChange={(e) => updateItemCategory(item.id, e.target.value)}
+                              className="text-xs px-2 py-1 border border-gray-300 rounded bg-white hover:border-primary-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {CATEGORY_ORDER.map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                              ))}
+                            </select>
                           </div>
                           {(item.quantity || item.unit) && (
                             <div className={`text-sm ${item.is_checked ? 'text-gray-400' : 'text-gray-600'}`}>

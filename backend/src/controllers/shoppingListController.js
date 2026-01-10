@@ -377,11 +377,11 @@ async function getShoppingList(req, res) {
 }
 
 /**
- * Update shopping list item (e.g., mark as checked)
+ * Update shopping list item (e.g., mark as checked, change category)
  */
 async function updateItem(req, res) {
   const { id } = req.params;
-  const { isChecked, notes } = req.body;
+  const { isChecked, notes, category } = req.body;
   const userId = req.user.userId;
 
   try {
@@ -397,14 +397,33 @@ async function updateItem(req, res) {
       return res.status(404).json({ error: 'Shopping list item not found' });
     }
 
+    const item = verifyResult.rows[0];
+
+    // If category is being changed, record it as a learning override
+    if (category && category !== item.category) {
+      const { recordCategoryOverride } = require('../utils/ingredientCategorizer');
+      try {
+        await recordCategoryOverride(item.ingredient_name, category, pool);
+        logger.info('Category override recorded', {
+          ingredient: item.ingredient_name,
+          oldCategory: item.category,
+          newCategory: category
+        });
+      } catch (error) {
+        logger.error('Failed to record category override', { error: error.message });
+        // Continue with update even if override recording fails
+      }
+    }
+
     // Update item
     const result = await pool.query(
       `UPDATE shopping_list_items
        SET is_checked = COALESCE($1, is_checked),
-           notes = COALESCE($2, notes)
-       WHERE id = $3
+           notes = COALESCE($2, notes),
+           category = COALESCE($3, category)
+       WHERE id = $4
        RETURNING *`,
-      [isChecked, notes, id]
+      [isChecked, notes, category, id]
     );
 
     res.json({ item: result.rows[0] });

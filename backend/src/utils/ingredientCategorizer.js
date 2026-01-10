@@ -334,7 +334,8 @@ const INGREDIENT_CATEGORY_MAP = {
 };
 
 /**
- * Categorizes an ingredient name into a grocery category
+ * Categorizes an ingredient name into a grocery category (synchronous version)
+ * Note: This doesn't check database overrides. Use categorizeIngredientAsync for full functionality.
  *
  * @param {string} ingredientName - The name of the ingredient (e.g., "cheddar cheese")
  * @returns {string} The category name (e.g., "Dairy & Eggs")
@@ -365,7 +366,79 @@ function categorizeIngredient(ingredientName) {
   return CATEGORIES.OTHER;
 }
 
+/**
+ * Categorizes an ingredient name with database override support (async version)
+ * Checks database for user-learned categories first, then falls back to built-in categorization
+ *
+ * @param {string} ingredientName - The name of the ingredient
+ * @param {object} pool - PostgreSQL connection pool
+ * @returns {Promise<string>} The category name
+ */
+async function categorizeIngredientAsync(ingredientName, pool) {
+  if (!ingredientName) {
+    return CATEGORIES.OTHER;
+  }
+
+  const normalized = ingredientName.toLowerCase().trim();
+
+  // Check database for user-learned category override
+  if (pool) {
+    try {
+      const result = await pool.query(
+        'SELECT category FROM ingredient_category_overrides WHERE ingredient_name = $1',
+        [normalized]
+      );
+
+      if (result.rows.length > 0) {
+        return result.rows[0].category;
+      }
+    } catch (error) {
+      // If database check fails, fall through to default categorization
+      console.error('Error checking category override:', error);
+    }
+  }
+
+  // Fall back to built-in categorization
+  return categorizeIngredient(ingredientName);
+}
+
+/**
+ * Record a user's category override for an ingredient
+ * This teaches the system the correct category for future use
+ *
+ * @param {string} ingredientName - The name of the ingredient
+ * @param {string} category - The corrected category
+ * @param {object} pool - PostgreSQL connection pool
+ * @returns {Promise<void>}
+ */
+async function recordCategoryOverride(ingredientName, category, pool) {
+  if (!ingredientName || !category || !pool) {
+    return;
+  }
+
+  const normalized = ingredientName.toLowerCase().trim();
+
+  try {
+    // Insert or update the override
+    await pool.query(
+      `INSERT INTO ingredient_category_overrides (ingredient_name, category, override_count)
+       VALUES ($1, $2, 1)
+       ON CONFLICT (ingredient_name)
+       DO UPDATE SET
+         category = $2,
+         override_count = ingredient_category_overrides.override_count + 1,
+         updated_at = CURRENT_TIMESTAMP`,
+      [normalized, category]
+    );
+  } catch (error) {
+    console.error('Error recording category override:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   CATEGORIES,
-  categorizeIngredient
+  categorizeIngredient,
+  categorizeIngredientAsync,
+  recordCategoryOverride
 };
