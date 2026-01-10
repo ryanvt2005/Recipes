@@ -4,6 +4,7 @@ const {
   saveRecipe,
   getRecipes,
   getRecipe,
+  getScaledRecipe,
   updateRecipe,
   deleteRecipe
 } = require('../controllers/recipeController');
@@ -54,6 +55,13 @@ router.get(
   '/:id',
   authenticateToken,
   getRecipe
+);
+
+// GET /api/v1/recipes/:id/scaled - Get a scaled version of a recipe
+router.get(
+  '/:id/scaled',
+  authenticateToken,
+  getScaledRecipe
 );
 
 // PUT /api/v1/recipes/:id - Update a recipe

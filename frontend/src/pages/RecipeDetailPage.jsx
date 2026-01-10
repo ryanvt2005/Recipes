@@ -4,14 +4,18 @@ import { recipes } from '../services/api';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
+import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
 
 export default function RecipeDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [recipe, setRecipe] = useState(null);
+  const [originalRecipe, setOriginalRecipe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
+  const [currentServings, setCurrentServings] = useState(null);
+  const [scalingError, setScalingError] = useState('');
 
   useEffect(() => {
     fetchRecipe();
@@ -21,12 +25,143 @@ export default function RecipeDetailPage() {
     try {
       setLoading(true);
       const response = await recipes.getOne(id);
-      setRecipe(response.data.recipe);
+      const fetchedRecipe = response.data.recipe;
+      setRecipe(fetchedRecipe);
+      setOriginalRecipe(fetchedRecipe);
+
+      // Parse initial servings
+      const servings = parseServings(fetchedRecipe.servings);
+      setCurrentServings(servings);
     } catch (err) {
       setError('Failed to load recipe');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper to parse servings from string
+  const parseServings = (servingsStr) => {
+    if (!servingsStr) return null;
+    const match = String(servingsStr).match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : null;
+  };
+
+  // Scale recipe to target servings
+  const handleScaleRecipe = async (targetServings) => {
+    if (!targetServings || targetServings <= 0) return;
+
+    setScalingError('');
+
+    try {
+      const response = await recipes.getScaled(id, targetServings);
+      const scaledRecipe = response.data.recipe;
+
+      if (scaledRecipe.scalingError) {
+        setScalingError(scaledRecipe.scalingError);
+        return;
+      }
+
+      setRecipe(scaledRecipe);
+      setCurrentServings(targetServings);
+    } catch (err) {
+      setScalingError('Failed to scale recipe');
+    }
+  };
+
+  // Reset to original recipe
+  const handleResetScale = () => {
+    setRecipe(originalRecipe);
+    const servings = parseServings(originalRecipe.servings);
+    setCurrentServings(servings);
+    setScalingError('');
+  };
+
+  // Increase servings
+  const increaseServings = () => {
+    if (currentServings) {
+      handleScaleRecipe(currentServings + 1);
+    }
+  };
+
+  // Decrease servings
+  const decreaseServings = () => {
+    if (currentServings && currentServings > 1) {
+      handleScaleRecipe(currentServings - 1);
+    }
+  };
+
+  // Format ingredient quantity for display
+  const formatQuantity = (ingredient) => {
+    if (!ingredient.quantity) {
+      return ingredient.rawText;
+    }
+
+    const qty = ingredient.quantity;
+    let displayQty = String(qty);
+
+    // Convert decimals to fractions
+    const fractionMap = {
+      0.125: '⅛',
+      0.25: '¼',
+      0.333: '⅓',
+      0.375: '⅜',
+      0.5: '½',
+      0.625: '⅝',
+      0.666: '⅔',
+      0.75: '¾',
+      0.875: '⅞'
+    };
+
+    const whole = Math.floor(qty);
+    const fraction = qty - whole;
+
+    for (const [decimal, frac] of Object.entries(fractionMap)) {
+      if (Math.abs(fraction - parseFloat(decimal)) < 0.01) {
+        displayQty = whole > 0 ? `${whole} ${frac}` : frac;
+        break;
+      }
+    }
+
+    // If not converted to fraction, format decimal
+    if (displayQty === String(qty) && fraction > 0.01) {
+      displayQty = qty.toFixed(2);
+    } else if (fraction < 0.01) {
+      displayQty = String(whole);
+    }
+
+    const unit = ingredient.unit || '';
+    const name = ingredient.ingredientName || '';
+
+    // Show original if scaled
+    if (ingredient.originalQuantity && Math.abs(ingredient.originalQuantity - qty) > 0.01) {
+      const originalQty = ingredient.originalQuantity;
+      let originalDisplay = String(originalQty);
+
+      const originalWhole = Math.floor(originalQty);
+      const originalFraction = originalQty - originalWhole;
+
+      for (const [decimal, frac] of Object.entries(fractionMap)) {
+        if (Math.abs(originalFraction - parseFloat(decimal)) < 0.01) {
+          originalDisplay = originalWhole > 0 ? `${originalWhole} ${frac}` : frac;
+          break;
+        }
+      }
+
+      if (originalDisplay === String(originalQty) && originalFraction > 0.01) {
+        originalDisplay = originalQty.toFixed(2);
+      } else if (originalFraction < 0.01) {
+        originalDisplay = String(originalWhole);
+      }
+
+      return (
+        <span>
+          <span className="font-semibold text-primary-700">{displayQty} {unit}</span> {name}
+          <span className="text-xs text-gray-500 ml-2">(originally {originalDisplay} {unit})</span>
+        </span>
+      );
+    }
+
+    return `${displayQty} ${unit} ${name}`.trim();
   };
 
   const handleDelete = async () => {
@@ -137,6 +272,57 @@ export default function RecipeDetailPage() {
           )}
         </div>
 
+        {/* Recipe Scaling */}
+        {currentServings && (
+          <div className="card mb-8 bg-gradient-to-r from-primary-50 to-blue-50">
+            <h3 className="text-lg font-semibold mb-3 text-gray-900">Adjust Servings</h3>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={decreaseServings}
+                disabled={currentServings <= 1}
+                className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title="Decrease servings"
+              >
+                <MinusIcon className="w-5 h-5 text-gray-700" />
+              </button>
+              <div className="text-center min-w-[120px]">
+                <div className="text-3xl font-bold text-primary-700">{currentServings}</div>
+                <div className="text-sm text-gray-600">servings</div>
+              </div>
+              <button
+                onClick={increaseServings}
+                className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
+                title="Increase servings"
+              >
+                <PlusIcon className="w-5 h-5 text-gray-700" />
+              </button>
+
+              {recipe.isScaled && (
+                <div className="ml-4 flex items-center gap-3">
+                  <span className="text-sm text-gray-600">
+                    Scaled from {recipe.originalServings} servings (×{recipe.scaleFactor.toFixed(2)})
+                  </span>
+                  <Button variant="secondary" size="sm" onClick={handleResetScale}>
+                    Reset to Original
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {scalingError && (
+              <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">
+                {scalingError}
+              </div>
+            )}
+
+            {recipe.isScaled && (
+              <div className="mt-4 text-sm text-blue-800 bg-blue-100 p-3 rounded-lg">
+                💡 <strong>Tip:</strong> Ingredient quantities have been automatically adjusted. Scaled amounts are shown in <span className="font-semibold text-primary-700">bold</span> with original amounts in gray.
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Tags */}
         {recipe.tags && recipe.tags.length > 0 && (
           <div className="mb-8">
@@ -166,7 +352,7 @@ export default function RecipeDetailPage() {
                     className="mt-1 mr-3 h-4 w-4 text-primary-600 rounded"
                   />
                   <span className="text-gray-700">
-                    {ingredient.rawText || `${ingredient.quantity || ''} ${ingredient.unit || ''} ${ingredient.ingredientName}`.trim()}
+                    {formatQuantity(ingredient)}
                   </span>
                 </li>
               ))}

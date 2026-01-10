@@ -1,6 +1,7 @@
 const pool = require('../config/database');
 const { extractRecipe, RecipeExtractionError } = require('../services/recipeExtractionService');
 const logger = require('../config/logger');
+const { scaleRecipe } = require('../utils/recipeScaling');
 
 /**
  * Extract recipe from URL
@@ -518,6 +519,46 @@ async function updateRecipe(req, res) {
 }
 
 /**
+ * Get a scaled version of a recipe
+ */
+async function getScaledRecipe(req, res) {
+  const userId = req.user.userId;
+  const recipeId = req.params.id;
+  const targetServings = parseInt(req.query.servings, 10);
+
+  try {
+    // Validate target servings
+    if (!targetServings || targetServings <= 0) {
+      return res.status(400).json({
+        error: 'INVALID_SERVINGS',
+        message: 'Target servings must be a positive number'
+      });
+    }
+
+    // Get the original recipe
+    const recipe = await getRecipeById(recipeId, userId);
+
+    if (!recipe) {
+      return res.status(404).json({
+        error: 'NOT_FOUND',
+        message: 'Recipe not found'
+      });
+    }
+
+    // Scale the recipe
+    const scaledRecipe = scaleRecipe(recipe, targetServings);
+
+    res.status(200).json({ recipe: scaledRecipe });
+  } catch (error) {
+    logger.error('Scale recipe error', { error: error.message });
+    res.status(500).json({
+      error: 'SCALE_FAILED',
+      message: 'Failed to scale recipe'
+    });
+  }
+}
+
+/**
  * Delete a recipe
  */
 async function deleteRecipe(req, res) {
@@ -554,6 +595,7 @@ module.exports = {
   saveRecipe,
   getRecipes,
   getRecipe,
+  getScaledRecipe,
   updateRecipe,
   deleteRecipe
 };

@@ -43,6 +43,7 @@ export const recipes = {
   create: (data) => api.post('/recipes', data),
   getAll: (params) => api.get('/recipes', { params }),
   getOne: (id) => api.get(`/recipes/${id}`),
+  getScaled: (id, servings) => api.get(`/recipes/${id}/scaled`, { params: { servings } }),
   update: (id, data) => api.put(`/recipes/${id}`, data),
   delete: (id) => api.delete(`/recipes/${id}`),
 };
