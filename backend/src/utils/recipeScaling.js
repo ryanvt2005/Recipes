@@ -15,13 +15,15 @@ function parseServings(servingsStr) {
   // Convert to string and trim
   const str = String(servingsStr).trim().toLowerCase();
 
-  // Match patterns like: "4", "4 servings", "serves 4", "4-6", "4 to 6"
+  // Match patterns like: "4", "4 servings", "serves 4", "4-6", "4 to 6", "makes 12", etc.
   const patterns = [
     /^(\d+)$/,                           // "4"
-    /^(\d+)\s*servings?$/,               // "4 servings"
+    /^(\d+)\s*servings?$/,               // "4 servings" or "4 serving(s)"
     /^serves?\s*(\d+)/,                  // "serves 4"
+    /^makes?\s*(\d+)/,                   // "makes 12" or "makes 15-18 truffles"
     /^(\d+)\s*[-to]\s*\d+/,             // "4-6" or "4 to 6" - take first number
     /^(\d+)\s*[-to]\s*\d+\s*servings?/, // "4-6 servings"
+    /(\d+)\s*serving/,                   // fallback: any number before "serving"
   ];
 
   for (const pattern of patterns) {
@@ -54,7 +56,7 @@ function scaleRecipe(recipe, targetServings) {
   if (!originalServings) {
     return {
       ...recipe,
-      scalingError: 'Cannot scale recipe: original servings not specified or invalid',
+      scalingError: `Cannot scale recipe: original servings not specified or invalid. Current value: "${recipe.servings || '(empty)'}"`,
       canScale: false
     };
   }
