@@ -86,9 +86,19 @@ const createShoppingListSchema = Joi.object({
   name: Joi.string().max(200).required()
 });
 
+// Add shopping list item schema
+const addShoppingListItemSchema = Joi.object({
+  ingredientName: Joi.string().max(200).required(),
+  quantity: Joi.number().optional().allow(null),
+  unit: Joi.string().max(50).optional().allow(null),
+  category: Joi.string().max(50).optional().allow(null),
+  notes: Joi.string().optional().allow(null, '')
+});
+
 // Update shopping list item schema
 const updateShoppingListItemSchema = Joi.object({
   isChecked: Joi.boolean().optional(),
+  ingredientName: Joi.string().max(200).optional(),
   quantity: Joi.number().optional().allow(null),
   unit: Joi.string().max(50).optional().allow(null),
   category: Joi.string().max(50).optional().allow(null),
@@ -127,6 +137,7 @@ module.exports = {
   mealPlanSchema,
   addRecipeToMealPlanSchema,
   createShoppingListSchema,
+  addShoppingListItemSchema,
   updateShoppingListItemSchema,
   validate
 };

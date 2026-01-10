@@ -79,6 +79,109 @@ function normalizeUnit(unit) {
 }
 
 /**
+ * Categorize ingredient by name
+ * Returns one of: Produce, Meat & Seafood, Dairy & Eggs, Pantry, Frozen, Bakery, Beverages, Other
+ */
+function categorizeIngredient(ingredientName) {
+  if (!ingredientName) {
+    return 'Other';
+  }
+
+  const name = ingredientName.toLowerCase();
+
+  // Produce
+  const produce = [
+    'lettuce', 'spinach', 'kale', 'arugula', 'cabbage', 'broccoli', 'cauliflower',
+    'carrot', 'celery', 'onion', 'garlic', 'shallot', 'leek', 'scallion', 'green onion',
+    'tomato', 'cucumber', 'pepper', 'bell pepper', 'jalapeño', 'chili',
+    'potato', 'sweet potato', 'yam', 'squash', 'zucchini', 'eggplant',
+    'mushroom', 'corn', 'peas', 'green beans', 'asparagus', 'bean sprout',
+    'apple', 'banana', 'orange', 'lemon', 'lime', 'berry', 'strawberry',
+    'blueberry', 'raspberry', 'grape', 'melon', 'watermelon', 'mango',
+    'pineapple', 'avocado', 'peach', 'plum', 'pear', 'cherry', 'grapefruit',
+    'herbs', 'parsley', 'cilantro', 'basil', 'thyme', 'rosemary', 'oregano',
+    'mint', 'dill', 'sage', 'ginger', 'salad', 'greens'
+  ];
+
+  // Meat & Seafood
+  const meat = [
+    'chicken', 'beef', 'pork', 'turkey', 'lamb', 'veal', 'duck', 'bacon',
+    'sausage', 'ham', 'steak', 'ground beef', 'ground turkey', 'ground pork',
+    'fish', 'salmon', 'tuna', 'cod', 'tilapia', 'shrimp', 'prawns', 'scallops',
+    'crab', 'lobster', 'clams', 'mussels', 'oysters', 'seafood', 'fillet'
+  ];
+
+  // Dairy & Eggs
+  const dairy = [
+    'milk', 'cream', 'half and half', 'buttermilk', 'sour cream',
+    'yogurt', 'greek yogurt', 'cheese', 'cheddar', 'mozzarella', 'parmesan',
+    'feta', 'goat cheese', 'cream cheese', 'cottage cheese', 'ricotta',
+    'butter', 'margarine', 'egg', 'eggs', 'whipped cream'
+  ];
+
+  // Pantry
+  const pantry = [
+    'flour', 'sugar', 'brown sugar', 'powdered sugar', 'salt', 'pepper',
+    'baking powder', 'baking soda', 'yeast', 'cornstarch', 'vanilla', 'extract',
+    'oil', 'olive oil', 'vegetable oil', 'coconut oil', 'vinegar',
+    'rice', 'pasta', 'noodles', 'quinoa', 'oats', 'cereal', 'bread crumbs',
+    'beans', 'lentils', 'chickpeas', 'can', 'canned', 'jar', 'jarred',
+    'sauce', 'tomato sauce', 'paste', 'broth', 'stock', 'bouillon',
+    'soy sauce', 'worcestershire', 'hot sauce', 'ketchup', 'mustard', 'mayo',
+    'peanut butter', 'jam', 'jelly', 'honey', 'maple syrup', 'molasses',
+    'nuts', 'almonds', 'walnuts', 'pecans', 'cashews', 'peanuts',
+    'chocolate', 'cocoa', 'chips', 'dried', 'raisins', 'dates',
+    'spice', 'cumin', 'paprika', 'chili powder', 'cinnamon', 'nutmeg',
+    'cayenne', 'turmeric', 'curry', 'seasoning', 'italian seasoning'
+  ];
+
+  // Frozen
+  const frozen = [
+    'frozen', 'ice cream', 'frozen vegetables', 'frozen fruit',
+    'pizza', 'frozen pizza', 'frozen dinner', 'popsicle', 'ice'
+  ];
+
+  // Bakery
+  const bakery = [
+    'bread', 'baguette', 'roll', 'bun', 'bagel', 'muffin', 'croissant',
+    'tortilla', 'pita', 'naan', 'flatbread', 'cake', 'pie', 'pastry',
+    'cookie', 'doughnut', 'donut'
+  ];
+
+  // Beverages
+  const beverages = [
+    'water', 'juice', 'soda', 'coffee', 'tea', 'beer', 'wine', 'liquor',
+    'vodka', 'rum', 'whiskey', 'gin', 'tequila', 'champagne', 'cider',
+    'lemonade', 'sports drink', 'energy drink', 'milk'
+  ];
+
+  // Check each category
+  if (produce.some(item => name.includes(item))) {
+    return 'Produce';
+  }
+  if (meat.some(item => name.includes(item))) {
+    return 'Meat & Seafood';
+  }
+  if (dairy.some(item => name.includes(item))) {
+    return 'Dairy & Eggs';
+  }
+  if (frozen.some(item => name.includes(item))) {
+    return 'Frozen';
+  }
+  if (bakery.some(item => name.includes(item))) {
+    return 'Bakery';
+  }
+  if (beverages.some(item => name.includes(item))) {
+    return 'Beverages';
+  }
+  if (pantry.some(item => name.includes(item))) {
+    return 'Pantry';
+  }
+
+  return 'Other';
+}
+
+/**
  * Parse ingredient text to extract quantity, unit, and name
  */
 function parseIngredient(rawText, ingredientName) {
@@ -148,7 +251,7 @@ function consolidateIngredients(recipeIngredients) {
         ingredient_name: parsed.name,
         quantity: parsed.quantity,
         unit: parsed.unit,
-        category: null // TODO: Could add categorization logic
+        category: categorizeIngredient(parsed.name)
       };
     }
   });
@@ -315,11 +418,56 @@ async function getShoppingList(req, res) {
 }
 
 /**
- * Update shopping list item (e.g., mark as checked)
+ * Add custom item to shopping list
+ */
+async function addItem(req, res) {
+  const { id } = req.params; // shopping list id
+  const { ingredientName, quantity, unit, category } = req.body;
+  const userId = req.user.userId;
+
+  try {
+    // Verify the shopping list belongs to the user
+    const listResult = await pool.query(
+      'SELECT * FROM shopping_lists WHERE id = $1 AND user_id = $2',
+      [id, userId]
+    );
+
+    if (listResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Shopping list not found' });
+    }
+
+    // Auto-categorize if not provided
+    const itemCategory = category || categorizeIngredient(ingredientName);
+
+    // Get max sort_order for this list
+    const sortResult = await pool.query(
+      'SELECT COALESCE(MAX(sort_order), 0) + 1 as next_order FROM shopping_list_items WHERE shopping_list_id = $1',
+      [id]
+    );
+    const sortOrder = sortResult.rows[0].next_order;
+
+    // Insert the new item
+    const result = await pool.query(
+      `INSERT INTO shopping_list_items (shopping_list_id, ingredient_name, quantity, unit, category, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [id, ingredientName.toLowerCase(), quantity, unit, itemCategory, sortOrder]
+    );
+
+    res.status(201).json({ item: result.rows[0] });
+
+  } catch (error) {
+    logger.error('Error adding item to shopping list', { error: error.message });
+    res.status(500).json({ error: 'Failed to add item' });
+  }
+}
+
+/**
+ * Update shopping list item (check/uncheck, edit, add notes)
  */
 async function updateItem(req, res) {
   const { id } = req.params;
-  const { isChecked, notes } = req.body;
+  const { isChecked, notes, ingredientName, quantity, unit, category } = req.body;
   const userId = req.user.userId;
 
   try {
@@ -335,14 +483,18 @@ async function updateItem(req, res) {
       return res.status(404).json({ error: 'Shopping list item not found' });
     }
 
-    // Update item
+    // Update item - only update fields that are provided
     const result = await pool.query(
       `UPDATE shopping_list_items
        SET is_checked = COALESCE($1, is_checked),
-           notes = COALESCE($2, notes)
-       WHERE id = $3
+           notes = COALESCE($2, notes),
+           ingredient_name = COALESCE($3, ingredient_name),
+           quantity = COALESCE($4, quantity),
+           unit = COALESCE($5, unit),
+           category = COALESCE($6, category)
+       WHERE id = $7
        RETURNING *`,
-      [isChecked, notes, id]
+      [isChecked, notes, ingredientName, quantity, unit, category, id]
     );
 
     res.json({ item: result.rows[0] });
@@ -350,6 +502,38 @@ async function updateItem(req, res) {
   } catch (error) {
     logger.error('Error updating shopping list item', { error: error.message });
     res.status(500).json({ error: 'Failed to update item' });
+  }
+}
+
+/**
+ * Delete individual shopping list item
+ */
+async function deleteItem(req, res) {
+  const { id } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    // Verify the item belongs to the user
+    const verifyResult = await pool.query(
+      `SELECT sli.* FROM shopping_list_items sli
+       INNER JOIN shopping_lists sl ON sli.shopping_list_id = sl.id
+       WHERE sli.id = $1 AND sl.user_id = $2`,
+      [id, userId]
+    );
+
+    if (verifyResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Shopping list item not found' });
+    }
+
+    // Delete the item
+    await pool.query('DELETE FROM shopping_list_items WHERE id = $1', [id]);
+
+    logger.info('Shopping list item deleted', { userId, itemId: id });
+    res.json({ message: 'Item deleted successfully' });
+
+  } catch (error) {
+    logger.error('Error deleting shopping list item', { error: error.message });
+    res.status(500).json({ error: 'Failed to delete item' });
   }
 }
 
@@ -383,6 +567,8 @@ module.exports = {
   createFromRecipes,
   getUserShoppingLists,
   getShoppingList,
+  addItem,
   updateItem,
+  deleteItem,
   deleteShoppingList
 };

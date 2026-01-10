@@ -52,7 +52,9 @@ export const shoppingLists = {
   createFromRecipes: (recipeIds, name) => api.post('/shopping-lists/from-recipes', { recipeIds, name }),
   getAll: () => api.get('/shopping-lists'),
   getOne: (id) => api.get(`/shopping-lists/${id}`),
+  addItem: (listId, data) => api.post(`/shopping-lists/${listId}/items`, data),
   updateItem: (itemId, data) => api.patch(`/shopping-lists/items/${itemId}`, data),
+  deleteItem: (itemId) => api.delete(`/shopping-lists/items/${itemId}`),
   delete: (id) => api.delete(`/shopping-lists/${id}`),
 };
 
