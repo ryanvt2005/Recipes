@@ -67,8 +67,33 @@ export default function ShoppingListPage() {
     return unit ? `${formatted} ${unit}` : formatted;
   };
 
+  // Category display order (matches typical grocery store layout)
+  const CATEGORY_ORDER = [
+    'Produce',
+    'Meat & Seafood',
+    'Dairy & Eggs',
+    'Bakery',
+    'Frozen',
+    'Canned & Jarred',
+    'Pantry',
+    'Spices & Seasonings',
+    'Condiments & Sauces',
+    'Beverages',
+    'Snacks',
+    'Other'
+  ];
+
   // Group items by category
-  const uncategorized = items.filter(item => !item.category);
+  const groupedItems = items.reduce((groups, item) => {
+    const category = item.category || 'Other';
+    if (!groups[category]) {
+      groups[category] = [];
+    }
+    groups[category].push(item);
+    return groups;
+  }, {});
+
+  // Calculate overall progress
   const checkedCount = items.filter(item => item.is_checked).length;
   const totalCount = items.length;
 
@@ -138,47 +163,72 @@ export default function ShoppingListPage() {
           </div>
         </div>
 
-        {/* Shopping List Items */}
-        <div className="card">
-          <h2 className="text-xl font-semibold mb-4">Items</h2>
-
+        {/* Shopping List Items - Grouped by Category */}
+        <div className="space-y-6">
           {items.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No items in this shopping list</p>
+            <div className="card">
+              <p className="text-gray-500 text-center py-8">No items in this shopping list</p>
+            </div>
           ) : (
-            <div className="space-y-2">
-              {uncategorized.map((item) => (
-                <div
-                  key={item.id}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                    item.is_checked
-                      ? 'bg-gray-50 border-gray-200'
-                      : 'bg-white border-gray-300 hover:border-primary-300'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={item.is_checked}
-                    onChange={() => toggleItemChecked(item.id, item.is_checked)}
-                    className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                  />
-                  <div className="flex-1">
-                    <div className={`font-medium ${item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                      {item.ingredient_name}
-                    </div>
-                    {(item.quantity || item.unit) && (
-                      <div className={`text-sm ${item.is_checked ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {formatQuantity(item.quantity, item.unit)}
+            CATEGORY_ORDER.map((category) => {
+              const categoryItems = groupedItems[category];
+
+              // Skip empty categories
+              if (!categoryItems || categoryItems.length === 0) {
+                return null;
+              }
+
+              const categoryChecked = categoryItems.filter(item => item.is_checked).length;
+              const categoryTotal = categoryItems.length;
+
+              return (
+                <div key={category} className="card">
+                  {/* Category Header */}
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                    <h3 className="text-lg font-semibold text-gray-900">{category}</h3>
+                    <span className="text-sm text-gray-600">
+                      {categoryChecked}/{categoryTotal} items
+                    </span>
+                  </div>
+
+                  {/* Category Items */}
+                  <div className="space-y-2">
+                    {categoryItems.map((item) => (
+                      <div
+                        key={item.id}
+                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                          item.is_checked
+                            ? 'bg-gray-50 border-gray-200'
+                            : 'bg-white border-gray-300 hover:border-primary-300'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.is_checked}
+                          onChange={() => toggleItemChecked(item.id, item.is_checked)}
+                          className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                        />
+                        <div className="flex-1">
+                          <div className={`font-medium ${item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
+                            {item.ingredient_name}
+                          </div>
+                          {(item.quantity || item.unit) && (
+                            <div className={`text-sm ${item.is_checked ? 'text-gray-400' : 'text-gray-600'}`}>
+                              {formatQuantity(item.quantity, item.unit)}
+                            </div>
+                          )}
+                          {item.notes && (
+                            <div className="text-sm text-gray-500 mt-1">
+                              {item.notes}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    )}
-                    {item.notes && (
-                      <div className="text-sm text-gray-500 mt-1">
-                        {item.notes}
-                      </div>
-                    )}
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })
           )}
         </div>
 
@@ -186,6 +236,7 @@ export default function ShoppingListPage() {
         <div className="card bg-blue-50 border-blue-200">
           <h3 className="font-semibold text-blue-900 mb-2">💡 Tips</h3>
           <ul className="text-sm text-blue-800 space-y-1">
+            <li>• Items are organized by grocery store category for easier shopping</li>
             <li>• Check off items as you shop to track your progress</li>
             <li>• Ingredients from multiple recipes have been combined</li>
             <li>• Similar ingredients with the same unit are consolidated</li>

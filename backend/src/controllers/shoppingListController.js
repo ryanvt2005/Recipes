@@ -1,5 +1,6 @@
 const pool = require('../config/database');
 const logger = require('../config/logger');
+const { categorizeIngredient } = require('../utils/ingredientCategorizer');
 
 /**
  * Parse quantity from ingredient text
@@ -148,7 +149,7 @@ function consolidateIngredients(recipeIngredients) {
         ingredient_name: parsed.name,
         quantity: parsed.quantity,
         unit: parsed.unit,
-        category: null // TODO: Could add categorization logic
+        category: categorizeIngredient(parsed.name)
       };
     }
   });
@@ -529,7 +530,7 @@ async function addRecipesToList(req, res) {
           ingredient_name: ing.ingredient_name,
           quantity: ing.quantity,
           unit: ing.unit,
-          category: ing.category,
+          category: ing.category || categorizeIngredient(ing.ingredient_name),
           existing: false
         };
       }
