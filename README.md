@@ -1,5 +1,7 @@
 # Recipe Management Application
 
+[![CI/CD Pipeline](https://github.com/ryanvt2005/Recipes/actions/workflows/main.yml/badge.svg)](https://github.com/ryanvt2005/Recipes/actions/workflows/main.yml)
+
 A full-stack web application for saving, organizing, and planning meals from recipes across the web. Features intelligent recipe extraction using a hybrid schema.org + LLM approach.
 
 ## Features
@@ -375,9 +377,22 @@ Recipes/
 - [ ] Nutritional information
 - [ ] Recipe collections and folders
 
+## Documentation
+
+- **[CI/CD Pipeline](docs/CICD.md)** - Detailed CI/CD workflow documentation
+- **[DevOps Quick Reference](docs/DEVOPS_QUICK_REFERENCE.md)** - Common commands and procedures
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests and linting
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
 ## License
 
@@ -386,4 +401,3 @@ ISC
 ## Support
 
 For issues and questions, please open an issue on GitHub.
-# Deployment triggered on Fri Jan  9 06:52:30 PM EST 2026
