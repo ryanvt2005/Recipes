@@ -158,6 +158,7 @@ function consolidateIngredients(recipeIngredients) {
 
 /**
  * Create a shopping list from selected recipes
+ * Accepts recipeIds as array of strings OR array of {recipeId, scaledServings} objects
  */
 async function createFromRecipes(req, res) {
   const { recipeIds, name } = req.body;
@@ -173,22 +174,58 @@ async function createFromRecipes(req, res) {
       return res.status(400).json({ error: 'Shopping list name is required' });
     }
 
-    // Get all ingredients from selected recipes
+    // Parse recipeIds - support both string array and object array
+    const recipeData = recipeIds.map(item => {
+      if (typeof item === 'string') {
+        return { recipeId: item, scaledServings: null };
+      }
+      return { recipeId: item.recipeId, scaledServings: item.scaledServings || null };
+    });
+
+    const justIds = recipeData.map(r => r.recipeId);
+
+    // Get all ingredients AND original servings from selected recipes
     const ingredientsResult = await pool.query(
-      `SELECT i.raw_text, i.quantity, i.unit, i.ingredient_name
+      `SELECT i.raw_text, i.quantity, i.unit, i.ingredient_name, i.recipe_id, r.servings as recipe_servings
        FROM ingredients i
        INNER JOIN recipes r ON i.recipe_id = r.id
        WHERE r.id = ANY($1) AND r.user_id = $2
        ORDER BY i.sort_order`,
-      [recipeIds, userId]
+      [justIds, userId]
     );
 
     if (ingredientsResult.rows.length === 0) {
       return res.status(404).json({ error: 'No ingredients found for selected recipes' });
     }
 
+    // Scale ingredients if needed
+    const scaledIngredients = ingredientsResult.rows.map(ingredient => {
+      const recipeInfo = recipeData.find(r => r.recipeId === ingredient.recipe_id);
+
+      if (!recipeInfo || !recipeInfo.scaledServings) {
+        // No scaling needed
+        return ingredient;
+      }
+
+      // Parse original servings
+      const { parseServings } = require('../utils/recipeScaling');
+      const originalServings = parseServings(ingredient.recipe_servings);
+
+      if (!originalServings) {
+        // Can't scale without original servings
+        return ingredient;
+      }
+
+      const scaleFactor = recipeInfo.scaledServings / originalServings;
+
+      return {
+        ...ingredient,
+        quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity
+      };
+    });
+
     // Consolidate ingredients
-    const consolidatedIngredients = consolidateIngredients(ingredientsResult.rows);
+    const consolidatedIngredients = consolidateIngredients(scaledIngredients);
 
     // Create shopping list
     const listResult = await pool.query(

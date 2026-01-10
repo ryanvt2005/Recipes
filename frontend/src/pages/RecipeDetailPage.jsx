@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { recipes } from '../services/api';
+import { recipes, shoppingLists } from '../services/api';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
-import { MinusIcon, PlusIcon } from '@heroicons/react/24/outline';
+import { MinusIcon, PlusIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 
 export default function RecipeDetailPage() {
   const { id } = useParams();
@@ -16,6 +16,7 @@ export default function RecipeDetailPage() {
   const [deleting, setDeleting] = useState(false);
   const [currentServings, setCurrentServings] = useState(null);
   const [scalingError, setScalingError] = useState('');
+  const [creatingList, setCreatingList] = useState(false);
 
   useEffect(() => {
     fetchRecipe();
@@ -179,6 +180,32 @@ export default function RecipeDetailPage() {
     }
   };
 
+  // Create shopping list with current (possibly scaled) servings
+  const handleCreateShoppingList = async () => {
+    try {
+      setCreatingList(true);
+      setError('');
+
+      // Prepare recipe data with scaled servings if applicable
+      const recipeData = {
+        recipeId: id,
+        scaledServings: recipe.isScaled ? currentServings : null
+      };
+
+      const listName = recipe.isScaled
+        ? `${recipe.title} (${currentServings} servings)`
+        : recipe.title;
+
+      const response = await shoppingLists.createFromRecipes([recipeData], listName);
+
+      // Navigate to the new shopping list
+      navigate(`/shopping-lists/${response.data.shoppingList.id}`);
+    } catch (err) {
+      setError('Failed to create shopping list');
+      setCreatingList(false);
+    }
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -230,6 +257,14 @@ export default function RecipeDetailPage() {
             )}
           </div>
           <div className="flex gap-2">
+            <Button
+              onClick={handleCreateShoppingList}
+              loading={creatingList}
+              className="flex items-center gap-2"
+            >
+              <ShoppingCartIcon className="w-5 h-5" />
+              {recipe.isScaled ? `Add to List (${currentServings} servings)` : 'Add to Shopping List'}
+            </Button>
             <Button variant="secondary" onClick={handleDelete} loading={deleting}>
               Delete
             </Button>
