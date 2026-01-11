@@ -2,6 +2,14 @@
 
 This guide walks you through setting up a self-hosted GitHub Actions runner on your AWS Lightsail instance for automated deployments.
 
+## ⚠️ Important: Amazon Linux 2 Users
+
+**If you're using Amazon Linux 2**, the latest GitHub Actions runner won't work due to GLIBC version requirements.
+
+👉 **See the fix:** [Amazon Linux 2 Runner Fix Guide](RUNNER_AMAZON_LINUX_2_FIX.md)
+
+**Quick solution:** Use runner version 2.298.2 instead of the latest version.
+
 ## Why Self-Hosted Runner?
 
 - ✅ No firewall configuration needed
@@ -15,6 +23,7 @@ This guide walks you through setting up a self-hosted GitHub Actions runner on y
 - SSH access to your Lightsail instance
 - GitHub repository admin access
 - Docker installed on Lightsail instance
+- Amazon Linux 2023 or Ubuntu (recommended) OR Amazon Linux 2 with [compatible runner version](RUNNER_AMAZON_LINUX_2_FIX.md)
 
 ## Installation Steps
 
