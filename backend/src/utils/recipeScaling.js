@@ -10,7 +10,9 @@
  * @returns {number|null} - The numeric serving size, or null if can't parse
  */
 function parseServings(servingsStr) {
-  if (!servingsStr) return null;
+  if (!servingsStr) {
+    return null;
+  }
 
   // Convert to string and trim
   const str = String(servingsStr).trim().toLowerCase();
@@ -88,7 +90,9 @@ function scaleRecipe(recipe, targetServings) {
  * @returns {string} - Fraction representation or decimal
  */
 function decimalToFraction(decimal) {
-  if (!decimal || decimal === 0) return '0';
+  if (!decimal || decimal === 0) {
+    return '0';
+  }
 
   const tolerance = 1.0E-6;
   const whole = Math.floor(decimal);
