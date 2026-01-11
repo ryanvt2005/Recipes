@@ -269,12 +269,18 @@ jobs:
           docker image prune -af --filter "until=24h" || true
 
           # Build new images using direct docker build (no buildx required)
+          # Build frontend first (most memory intensive)
+          echo "🏗️  Building frontend image..."
+          NODE_OPTIONS="--max-old-space-size=768" docker build -t recipe-app-frontend:latest \
+            --target production \
+            --build-arg VITE_API_URL=http://44.204.123.21:3000 \
+            ./frontend
+
+          # Free up memory before backend build
+          docker image prune -f || true
+
           echo "🏗️  Building backend image..."
           docker build -t recipe-app-backend:latest --target prod ./backend
-
-          echo "🏗️  Building frontend image..."
-          docker build -t recipe-app-frontend:latest --target production \
-            --build-arg VITE_API_URL=http://44.204.123.21:3000 ./frontend
 
           # Create network if it doesn't exist
           echo "🔗 Creating Docker network..."
