@@ -4,7 +4,7 @@ const pool = require('../config/database');
 const getNoteForRecipe = async (req, res) => {
   try {
     const { recipeId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     const result = await pool.query(
       'SELECT * FROM recipe_notes WHERE recipe_id = $1 AND user_id = $2',
@@ -27,23 +27,31 @@ const upsertNoteForRecipe = async (req, res) => {
   try {
     const { recipeId } = req.params;
     const { noteText } = req.body;
-    const userId = req.user.id;
+    const userId = req.user.userId;
+
+    console.log('Upsert note request:', { recipeId, userId, noteTextLength: noteText?.length });
 
     if (!noteText || noteText.trim() === '') {
+      console.log('Note text validation failed');
       return res.status(400).json({ error: 'Note text is required' });
     }
 
     // Verify recipe exists and belongs to user
+    console.log('Checking if recipe exists for user...');
     const recipeCheck = await pool.query('SELECT id FROM recipes WHERE id = $1 AND user_id = $2', [
       recipeId,
       userId,
     ]);
 
+    console.log('Recipe check result:', { found: recipeCheck.rows.length });
+
     if (recipeCheck.rows.length === 0) {
+      console.log('Recipe not found or does not belong to user');
       return res.status(404).json({ error: 'Recipe not found' });
     }
 
     // Upsert the note (insert or update if exists)
+    console.log('Upserting note...');
     const result = await pool.query(
       `INSERT INTO recipe_notes (recipe_id, user_id, note_text)
        VALUES ($1, $2, $3)
@@ -53,9 +61,11 @@ const upsertNoteForRecipe = async (req, res) => {
       [recipeId, userId, noteText.trim()]
     );
 
+    console.log('Note upserted successfully:', result.rows[0].id);
     res.json({ note: result.rows[0] });
   } catch (error) {
     console.error('Error saving recipe note:', error);
+    console.error('Error details:', error.message, error.stack);
     res.status(500).json({ error: 'Failed to save note' });
   }
 };
@@ -64,7 +74,7 @@ const upsertNoteForRecipe = async (req, res) => {
 const deleteNoteForRecipe = async (req, res) => {
   try {
     const { recipeId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     const result = await pool.query(
       'DELETE FROM recipe_notes WHERE recipe_id = $1 AND user_id = $2 RETURNING *',
