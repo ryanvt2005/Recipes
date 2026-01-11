@@ -212,7 +212,6 @@ jobs:
        (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'development'))
     environment:
       name: development
-      url: http://${{ secrets.LIGHTSAIL_IP }}:3000
     concurrency:
       group: deploy-development
       cancel-in-progress: false
@@ -258,19 +257,17 @@ jobs:
 
           # Create/update environment file
           echo "🔧 Updating environment configuration..."
-          cat > .env << 'ENVEOF'
-DB_HOST=db
-DB_PORT=5432
-DB_NAME=recipeapp
-DB_USER=recipeuser
-DB_PASSWORD=$DB_PASSWORD
-JWT_SECRET=$JWT_SECRET
-ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
-NODE_ENV=production
-PORT=3000
-FRONTEND_URL=http://$LIGHTSAIL_IP:3001
-VITE_API_URL=http://$LIGHTSAIL_IP:3000
-ENVEOF
+          echo "DB_HOST=db" > .env
+          echo "DB_PORT=5432" >> .env
+          echo "DB_NAME=recipeapp" >> .env
+          echo "DB_USER=recipeuser" >> .env
+          echo "DB_PASSWORD=$DB_PASSWORD" >> .env
+          echo "JWT_SECRET=$JWT_SECRET" >> .env
+          echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" >> .env
+          echo "NODE_ENV=production" >> .env
+          echo "PORT=3000" >> .env
+          echo "FRONTEND_URL=http://$LIGHTSAIL_IP:3001" >> .env
+          echo "VITE_API_URL=http://$LIGHTSAIL_IP:3000" >> .env
 
           # Stop existing containers
           echo "🛑 Stopping existing containers..."
