@@ -267,9 +267,10 @@ jobs:
           echo "🧹 Cleaning up old Docker images..."
           docker image prune -af --filter "until=24h" || true
 
-          # Build new images
+          # Build new images (pull fresh to avoid cache issues)
           echo "🏗️  Building Docker images..."
-          docker compose build --no-cache
+          docker compose pull || true
+          docker compose build
 
           # Start services
           echo "🚀 Starting services..."
