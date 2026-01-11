@@ -6,7 +6,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
 import ShoppingListSelectorModal from '../components/ShoppingListSelectorModal';
 import RecipeNotes from '../components/RecipeNotes';
-import { MinusIcon, PlusIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
+import { MinusIcon, PlusIcon, ShoppingCartIcon, PrinterIcon } from '@heroicons/react/24/outline';
 
 export default function RecipeDetailPage() {
   const { id } = useParams();
@@ -234,6 +234,11 @@ export default function RecipeDetailPage() {
     }
   };
 
+  // Handle print recipe
+  const handlePrint = () => {
+    window.print();
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -295,16 +300,24 @@ export default function RecipeDetailPage() {
           </div>
           <div className="flex gap-2">
             <Button
+              onClick={handlePrint}
+              variant="outline"
+              className="flex items-center gap-2 no-print"
+            >
+              <PrinterIcon className="w-5 h-5" />
+              Print
+            </Button>
+            <Button
               onClick={handleAddToShoppingList}
               loading={creatingList}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 no-print"
             >
               <ShoppingCartIcon className="w-5 h-5" />
               {recipe.isScaled
                 ? `Add to List (${currentServings} servings)`
                 : 'Add to Shopping List'}
             </Button>
-            <Button variant="secondary" onClick={handleDelete} loading={deleting}>
+            <Button variant="secondary" onClick={handleDelete} loading={deleting} className="no-print">
               Delete
             </Button>
           </div>
