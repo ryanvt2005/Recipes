@@ -239,7 +239,7 @@ If deployment gets stuck waiting for runner:
 
 ```bash
 # SSH into Lightsail
-ssh ubuntu@44.204.123.21
+ssh ubuntu@100.25.44.113
 
 # Check runner status
 sudo ~/actions-runner/svc.sh status
@@ -299,7 +299,7 @@ This triggers a new deployment with the previous code.
 
 ```bash
 # SSH into Lightsail
-ssh ubuntu@44.204.123.21
+ssh ubuntu@100.25.44.113
 
 # Go to app directory
 cd ~/Recipes
@@ -363,17 +363,17 @@ gh run view <run-id>
 
 ```bash
 # Backend health
-curl http://44.204.123.21:3000/health
+curl http://100.25.44.113:3000/health
 
 # Frontend
-curl http://44.204.123.21:3001
+curl http://100.25.44.113:3001
 ```
 
 ### View Logs
 
 ```bash
 # SSH into Lightsail
-ssh ubuntu@44.204.123.21
+ssh ubuntu@100.25.44.113
 
 # View backend logs
 docker logs -f recipe-app-backend
@@ -436,7 +436,7 @@ docker logs -f recipe-app-db
 │  │  - Backend (Node)  │  │
 │  │  - Database (PG)   │  │
 │  └────────────────────┘  │
-│  44.204.123.21          │
+│  100.25.44.113          │
 └─────────────────────────┘
 ```
 
