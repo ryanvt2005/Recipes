@@ -34,10 +34,10 @@ const upsertNoteForRecipe = async (req, res) => {
     }
 
     // Verify recipe exists and belongs to user
-    const recipeCheck = await pool.query(
-      'SELECT id FROM recipes WHERE id = $1 AND user_id = $2',
-      [recipeId, userId]
-    );
+    const recipeCheck = await pool.query('SELECT id FROM recipes WHERE id = $1 AND user_id = $2', [
+      recipeId,
+      userId,
+    ]);
 
     if (recipeCheck.rows.length === 0) {
       return res.status(404).json({ error: 'Recipe not found' });
