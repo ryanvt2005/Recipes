@@ -228,7 +228,11 @@ jobs:
           mkdir -p ~/.ssh
           echo "$LIGHTSAIL_SSH_KEY" > ~/.ssh/lightsail_key
           chmod 600 ~/.ssh/lightsail_key
-          ssh-keyscan -H $LIGHTSAIL_IP >> ~/.ssh/known_hosts
+          ssh-keyscan -H $LIGHTSAIL_IP >> ~/.ssh/known_hosts || echo "Warning: Could not scan host keys"
+          # Disable strict host key checking as fallback
+          echo "Host $LIGHTSAIL_IP" >> ~/.ssh/config
+          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
+          echo "  UserKnownHostsFile ~/.ssh/known_hosts" >> ~/.ssh/config
 
       - name: Deploy to Lightsail
         env:
