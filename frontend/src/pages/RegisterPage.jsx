@@ -40,12 +40,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      await register(
-        formData.email,
-        formData.password,
-        formData.firstName,
-        formData.lastName
-      );
+      await register(formData.email, formData.password, formData.firstName, formData.lastName);
       navigate('/recipes');
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
@@ -124,12 +119,7 @@ export default function RegisterPage() {
             autoComplete="new-password"
           />
 
-          <Button
-            type="submit"
-            className="w-full"
-            loading={loading}
-            disabled={loading}
-          >
+          <Button type="submit" className="w-full" loading={loading} disabled={loading}>
             Create Account
           </Button>
         </form>

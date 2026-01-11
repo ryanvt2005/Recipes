@@ -68,12 +68,7 @@ export default function LoginPage() {
             autoComplete="current-password"
           />
 
-          <Button
-            type="submit"
-            className="w-full"
-            loading={loading}
-            disabled={loading}
-          >
+          <Button type="submit" className="w-full" loading={loading} disabled={loading}>
             Sign in
           </Button>
         </form>

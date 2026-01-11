@@ -28,7 +28,7 @@ function normalizeUrl(url) {
     const urlObj = new URL(url);
     // Remove common tracking parameters
     const trackingParams = ['utm_source', 'utm_medium', 'utm_campaign', 'fbclid', 'gclid'];
-    trackingParams.forEach(param => urlObj.searchParams.delete(param));
+    trackingParams.forEach((param) => urlObj.searchParams.delete(param));
     // Remove fragment
     urlObj.hash = '';
     return urlObj.toString();
@@ -64,7 +64,7 @@ async function checkCache(url) {
       return {
         ...result.rows[0].extracted_data,
         extractionMethod: result.rows[0].extraction_method,
-        cached: true
+        cached: true,
       };
     }
 
@@ -108,28 +108,34 @@ async function fetchHtml(url) {
 
     const response = await axios.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
-        'Referer': origin + '/',
+        Referer: origin + '/',
         'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
+        Pragma: 'no-cache',
         'Sec-Fetch-Dest': 'document',
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-Site': 'same-origin',
         'Sec-Fetch-User': '?1',
         'Upgrade-Insecure-Requests': '1',
-        'DNT': '1'
+        DNT: '1',
       },
       timeout: 15000,
       maxRedirects: 5,
-      validateStatus: (status) => status >= 200 && status < 400
+      validateStatus: (status) => status >= 200 && status < 400,
     });
 
     return response.data;
   } catch (error) {
-    logger.error('Failed to fetch URL', { url, error: error.message, status: error.response?.status });
+    logger.error('Failed to fetch URL', {
+      url,
+      error: error.message,
+      status: error.response?.status,
+    });
     throw new RecipeExtractionError(
       'Could not fetch the webpage',
       'URL_FETCH_FAILED',
@@ -142,7 +148,9 @@ async function fetchHtml(url) {
  * Extract image URL from schema.org image field
  */
 function extractImageUrl(imageField) {
-  if (!imageField) {return null;}
+  if (!imageField) {
+    return null;
+  }
 
   if (typeof imageField === 'string') {
     return imageField;
@@ -163,10 +171,14 @@ function extractImageUrl(imageField) {
  * Parse ISO 8601 duration to human-readable format
  */
 function parseDuration(duration) {
-  if (!duration || typeof duration !== 'string') {return null;}
+  if (!duration || typeof duration !== 'string') {
+    return null;
+  }
 
   const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?/);
-  if (!match) {return duration;}
+  if (!match) {
+    return duration;
+  }
 
   const hours = parseInt(match[1] || 0);
   const minutes = parseInt(match[2] || 0);
@@ -186,7 +198,9 @@ function parseDuration(duration) {
  * Parse schema.org ingredients (can be strings, objects, or HowToSection objects)
  */
 function parseSchemaIngredients(ingredients) {
-  if (!Array.isArray(ingredients)) {return [];}
+  if (!Array.isArray(ingredients)) {
+    return [];
+  }
 
   const parsed = [];
   let sortOrder = 0;
@@ -197,8 +211,8 @@ function parseSchemaIngredients(ingredients) {
     if (typeof ingredient === 'object' && ingredient['@type'] === 'HowToSection') {
       currentGroup = ingredient.name || null;
       if (Array.isArray(ingredient.itemListElement)) {
-        ingredient.itemListElement.forEach(item => {
-          const text = typeof item === 'string' ? item : (item.text || item.name);
+        ingredient.itemListElement.forEach((item) => {
+          const text = typeof item === 'string' ? item : item.text || item.name;
           if (text) {
             const parsedIng = parseIngredientString(text, sortOrder++);
             parsedIng.group = currentGroup;
@@ -237,7 +251,7 @@ function parseSchemaInstructions(instructions) {
 
   const parsed = [];
 
-  instructions.forEach(instruction => {
+  instructions.forEach((instruction) => {
     // Handle plain string
     if (typeof instruction === 'string') {
       parsed.push(instruction);
@@ -245,8 +259,8 @@ function parseSchemaInstructions(instructions) {
     // Handle HowToSection (contains multiple steps)
     else if (typeof instruction === 'object' && instruction['@type'] === 'HowToSection') {
       if (Array.isArray(instruction.itemListElement)) {
-        instruction.itemListElement.forEach(step => {
-          const text = typeof step === 'string' ? step : (step.text || step.description);
+        instruction.itemListElement.forEach((step) => {
+          const text = typeof step === 'string' ? step : step.text || step.description;
           if (text) {
             parsed.push(text);
           }
@@ -281,7 +295,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
       unit: match[2] || null,
       ingredient: match[3].trim(),
       preparation: match[4] || null,
-      group: null
+      group: null,
     };
   }
 
@@ -293,7 +307,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
     unit: null,
     ingredient: rawText,
     preparation: null,
-    group: null
+    group: null,
   };
 }
 
@@ -301,7 +315,9 @@ function parseIngredientString(rawText, sortOrder = 0) {
  * Parse quantity (handles fractions)
  */
 function parseQuantity(quantityStr) {
-  if (!quantityStr) {return null;}
+  if (!quantityStr) {
+    return null;
+  }
 
   // Handle fractions like "1/2"
   if (quantityStr.includes('/')) {
@@ -324,12 +340,15 @@ function extractRecipeFromSchema(html) {
       const jsonLd = JSON.parse($(scripts[i]).html());
       const recipes = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
 
-      const recipeData = recipes.find(item =>
-        item['@type'] === 'Recipe' ||
-        (Array.isArray(item['@type']) && item['@type'].includes('Recipe'))
+      const recipeData = recipes.find(
+        (item) =>
+          item['@type'] === 'Recipe' ||
+          (Array.isArray(item['@type']) && item['@type'].includes('Recipe'))
       );
 
-      if (!recipeData) {continue;}
+      if (!recipeData) {
+        continue;
+      }
 
       // Validate required fields
       if (!recipeData.name || !recipeData.recipeIngredient || !recipeData.recipeInstructions) {
@@ -346,7 +365,7 @@ function extractRecipeFromSchema(html) {
         cookTime: parseDuration(recipeData.cookTime),
         totalTime: parseDuration(recipeData.totalTime),
         ingredients: parseSchemaIngredients(recipeData.recipeIngredient),
-        instructions: parseSchemaInstructions(recipeData.recipeInstructions)
+        instructions: parseSchemaInstructions(recipeData.recipeInstructions),
       };
 
       // Final validation
@@ -373,7 +392,9 @@ function cleanHtmlForLLM(html) {
   $('script, style, nav, header, footer, iframe, .ad, .advertisement, .social-share').remove();
 
   // Try to find main content area
-  const mainContent = $('article, [role="main"], main, .recipe, .post-content, .entry-content').first();
+  const mainContent = $(
+    'article, [role="main"], main, .recipe, .post-content, .entry-content'
+  ).first();
 
   if (mainContent.length > 0) {
     return mainContent.text().trim().substring(0, 15000); // Limit to 15k chars
@@ -429,10 +450,12 @@ ${cleanedHtml}`;
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 4000,
-      messages: [{
-        role: 'user',
-        content: prompt
-      }]
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
     });
 
     const jsonText = response.content[0].text.trim();
@@ -468,7 +491,7 @@ ${cleanedHtml}`;
     // Ensure ingredients have sortOrder
     recipe.ingredients = recipe.ingredients.map((ing, index) => ({
       ...ing,
-      sortOrder: ing.sortOrder || index
+      sortOrder: ing.sortOrder || index,
     }));
 
     logger.info('Successfully extracted recipe with LLM');
@@ -523,5 +546,5 @@ async function extractRecipe(url) {
 
 module.exports = {
   extractRecipe,
-  RecipeExtractionError
+  RecipeExtractionError,
 };

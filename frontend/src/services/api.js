@@ -50,8 +50,10 @@ export const recipes = {
 
 // Shopping list endpoints
 export const shoppingLists = {
-  createFromRecipes: (recipeIds, name) => api.post('/shopping-lists/from-recipes', { recipeIds, name }),
-  addRecipesToList: (listId, recipeIds) => api.post(`/shopping-lists/${listId}/add-recipes`, { recipeIds }),
+  createFromRecipes: (recipeIds, name) =>
+    api.post('/shopping-lists/from-recipes', { recipeIds, name }),
+  addRecipesToList: (listId, recipeIds) =>
+    api.post(`/shopping-lists/${listId}/add-recipes`, { recipeIds }),
   getAll: () => api.get('/shopping-lists'),
   getOne: (id) => api.get(`/shopping-lists/${id}`),
   updateItem: (itemId, data) => api.patch(`/shopping-lists/items/${itemId}`, data),

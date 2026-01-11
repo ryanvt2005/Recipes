@@ -18,14 +18,14 @@ async function extractRecipeFromUrl(req, res) {
       return res.status(422).json({
         error: error.code,
         message: error.message,
-        details: error.details
+        details: error.details,
       });
     }
 
     logger.error('Recipe extraction error', { error: error.message });
     res.status(500).json({
       error: 'EXTRACTION_ERROR',
-      message: 'An unexpected error occurred during extraction'
+      message: 'An unexpected error occurred during extraction',
     });
   }
 }
@@ -47,7 +47,7 @@ async function saveRecipe(req, res) {
     ingredients,
     instructions,
     tags,
-    extractionMethod
+    extractionMethod,
   } = req.body;
 
   const client = await pool.connect();
@@ -71,7 +71,7 @@ async function saveRecipe(req, res) {
         prepTime || null,
         cookTime || null,
         totalTime || null,
-        extractionMethod || 'manual'
+        extractionMethod || 'manual',
       ]
     );
 
@@ -92,7 +92,7 @@ async function saveRecipe(req, res) {
           ing.unit || null,
           ing.ingredient,
           ing.preparation || null,
-          ing.group || null
+          ing.group || null,
         ]
       );
     }
@@ -141,7 +141,7 @@ async function saveRecipe(req, res) {
     logger.error('Save recipe error', { error: error.message });
     res.status(500).json({
       error: 'SAVE_FAILED',
-      message: 'Failed to save recipe'
+      message: 'Failed to save recipe',
     });
   } finally {
     client.release();
@@ -159,7 +159,7 @@ async function getRecipes(req, res) {
     search = '',
     tags = '',
     sortBy = 'createdAt',
-    sortOrder = 'desc'
+    sortOrder = 'desc',
   } = req.query;
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -186,7 +186,7 @@ async function getRecipes(req, res) {
 
     // Add tags filter
     if (tags) {
-      const tagArray = tags.split(',').map(t => t.trim().toLowerCase());
+      const tagArray = tags.split(',').map((t) => t.trim().toLowerCase());
       paramCount++;
       query += ` AND EXISTS (
         SELECT 1 FROM recipe_tags rt
@@ -198,15 +198,21 @@ async function getRecipes(req, res) {
 
     // Get total count
     const countResult = await pool.query(
-      query.replace('SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.total_time, r.created_at', 'SELECT COUNT(DISTINCT r.id)'),
+      query.replace(
+        'SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.total_time, r.created_at',
+        'SELECT COUNT(DISTINCT r.id)'
+      ),
       params
     );
     const total = parseInt(countResult.rows[0].count);
 
     // Add sorting and pagination
-    const sortColumn = validSortBy === 'createdAt' ? 'r.created_at' :
-                       validSortBy === 'updatedAt' ? 'r.updated_at' :
-                       'r.title';
+    const sortColumn =
+      validSortBy === 'createdAt'
+        ? 'r.created_at'
+        : validSortBy === 'updatedAt'
+          ? 'r.updated_at'
+          : 'r.title';
     query += ` ORDER BY ${sortColumn} ${validSortOrder}`;
     query += ` LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     params.push(parseInt(limit), offset);
@@ -215,25 +221,27 @@ async function getRecipes(req, res) {
     const result = await pool.query(query, params);
 
     // Fetch tags for each recipe
-    const recipes = await Promise.all(result.rows.map(async (recipe) => {
-      const tagsResult = await pool.query(
-        `SELECT t.name FROM tags t
+    const recipes = await Promise.all(
+      result.rows.map(async (recipe) => {
+        const tagsResult = await pool.query(
+          `SELECT t.name FROM tags t
          JOIN recipe_tags rt ON t.id = rt.tag_id
          WHERE rt.recipe_id = $1`,
-        [recipe.id]
-      );
+          [recipe.id]
+        );
 
-      return {
-        id: recipe.id,
-        title: recipe.title,
-        description: recipe.description,
-        imageUrl: recipe.image_url,
-        servings: recipe.servings,
-        totalTime: recipe.total_time,
-        tags: tagsResult.rows.map(t => t.name),
-        createdAt: recipe.created_at
-      };
-    }));
+        return {
+          id: recipe.id,
+          title: recipe.title,
+          description: recipe.description,
+          imageUrl: recipe.image_url,
+          servings: recipe.servings,
+          totalTime: recipe.total_time,
+          tags: tagsResult.rows.map((t) => t.name),
+          createdAt: recipe.created_at,
+        };
+      })
+    );
 
     res.status(200).json({
       recipes,
@@ -241,14 +249,14 @@ async function getRecipes(req, res) {
         page: parseInt(page),
         limit: parseInt(limit),
         total,
-        totalPages: Math.ceil(total / parseInt(limit))
-      }
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
     });
   } catch (error) {
     logger.error('Get recipes error', { error: error.message });
     res.status(500).json({
       error: 'FETCH_FAILED',
-      message: 'Failed to fetch recipes'
+      message: 'Failed to fetch recipes',
     });
   }
 }
@@ -266,7 +274,7 @@ async function getRecipe(req, res) {
     if (!recipe) {
       return res.status(404).json({
         error: 'NOT_FOUND',
-        message: 'Recipe not found'
+        message: 'Recipe not found',
       });
     }
 
@@ -275,7 +283,7 @@ async function getRecipe(req, res) {
     logger.error('Get recipe error', { error: error.message });
     res.status(500).json({
       error: 'FETCH_FAILED',
-      message: 'Failed to fetch recipe'
+      message: 'Failed to fetch recipe',
     });
   }
 }
@@ -285,10 +293,10 @@ async function getRecipe(req, res) {
  */
 async function getRecipeById(recipeId, userId) {
   // Get recipe
-  const recipeResult = await pool.query(
-    `SELECT * FROM recipes WHERE id = $1 AND user_id = $2`,
-    [recipeId, userId]
-  );
+  const recipeResult = await pool.query(`SELECT * FROM recipes WHERE id = $1 AND user_id = $2`, [
+    recipeId,
+    userId,
+  ]);
 
   if (recipeResult.rows.length === 0) {
     return null;
@@ -330,7 +338,7 @@ async function getRecipeById(recipeId, userId) {
     extractionMethod: recipe.extraction_method,
     createdAt: recipe.created_at,
     updatedAt: recipe.updated_at,
-    ingredients: ingredientsResult.rows.map(i => ({
+    ingredients: ingredientsResult.rows.map((i) => ({
       id: i.id,
       sortOrder: i.sort_order,
       rawText: i.raw_text,
@@ -338,14 +346,14 @@ async function getRecipeById(recipeId, userId) {
       unit: i.unit,
       ingredientName: i.ingredient_name,
       preparation: i.preparation,
-      ingredientGroup: i.ingredient_group
+      ingredientGroup: i.ingredient_group,
     })),
-    instructions: instructionsResult.rows.map(i => ({
+    instructions: instructionsResult.rows.map((i) => ({
       id: i.id,
       stepNumber: i.step_number,
-      instructionText: i.instruction_text
+      instructionText: i.instruction_text,
     })),
-    tags: tagsResult.rows
+    tags: tagsResult.rows,
   };
 }
 
@@ -366,7 +374,7 @@ async function updateRecipe(req, res) {
     totalTime,
     ingredients,
     instructions,
-    tags
+    tags,
   } = req.body;
 
   const client = await pool.connect();
@@ -384,7 +392,7 @@ async function updateRecipe(req, res) {
       await client.query('ROLLBACK');
       return res.status(404).json({
         error: 'NOT_FOUND',
-        message: 'Recipe not found'
+        message: 'Recipe not found',
       });
     }
 
@@ -454,7 +462,7 @@ async function updateRecipe(req, res) {
             ing.unit || null,
             ing.ingredient,
             ing.preparation || null,
-            ing.group || null
+            ing.group || null,
           ]
         );
       }
@@ -491,10 +499,10 @@ async function updateRecipe(req, res) {
 
         const tagId = tagResult.rows[0].id;
 
-        await client.query(
-          `INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ($1, $2)`,
-          [recipeId, tagId]
-        );
+        await client.query(`INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ($1, $2)`, [
+          recipeId,
+          tagId,
+        ]);
       }
     }
 
@@ -511,7 +519,7 @@ async function updateRecipe(req, res) {
     logger.error('Update recipe error', { error: error.message });
     res.status(500).json({
       error: 'UPDATE_FAILED',
-      message: 'Failed to update recipe'
+      message: 'Failed to update recipe',
     });
   } finally {
     client.release();
@@ -531,7 +539,7 @@ async function getScaledRecipe(req, res) {
     if (!targetServings || targetServings <= 0) {
       return res.status(400).json({
         error: 'INVALID_SERVINGS',
-        message: 'Target servings must be a positive number'
+        message: 'Target servings must be a positive number',
       });
     }
 
@@ -541,7 +549,7 @@ async function getScaledRecipe(req, res) {
     if (!recipe) {
       return res.status(404).json({
         error: 'NOT_FOUND',
-        message: 'Recipe not found'
+        message: 'Recipe not found',
       });
     }
 
@@ -553,7 +561,7 @@ async function getScaledRecipe(req, res) {
     logger.error('Scale recipe error', { error: error.message });
     res.status(500).json({
       error: 'SCALE_FAILED',
-      message: 'Failed to scale recipe'
+      message: 'Failed to scale recipe',
     });
   }
 }
@@ -574,7 +582,7 @@ async function deleteRecipe(req, res) {
     if (result.rows.length === 0) {
       return res.status(404).json({
         error: 'NOT_FOUND',
-        message: 'Recipe not found'
+        message: 'Recipe not found',
       });
     }
 
@@ -585,7 +593,7 @@ async function deleteRecipe(req, res) {
     logger.error('Delete recipe error', { error: error.message });
     res.status(500).json({
       error: 'DELETE_FAILED',
-      message: 'Failed to delete recipe'
+      message: 'Failed to delete recipe',
     });
   }
 }
@@ -597,5 +605,5 @@ module.exports = {
   getRecipe,
   getScaledRecipe,
   updateRecipe,
-  deleteRecipe
+  deleteRecipe,
 };

@@ -6,14 +6,14 @@ const {
   getRecipe,
   getScaledRecipe,
   updateRecipe,
-  deleteRecipe
+  deleteRecipe,
 } = require('../controllers/recipeController');
 const { authenticateToken } = require('../middlewares/auth');
 const {
   validate,
   extractRecipeSchema,
   saveRecipeSchema,
-  updateRecipeSchema
+  updateRecipeSchema,
 } = require('../utils/validation');
 const rateLimit = require('express-rate-limit');
 
@@ -23,7 +23,10 @@ const router = express.Router();
 const extractionLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 10, // 10 requests per window
-  message: { error: 'RATE_LIMIT_EXCEEDED', message: 'Too many extraction requests, please try again later' }
+  message: {
+    error: 'RATE_LIMIT_EXCEEDED',
+    message: 'Too many extraction requests, please try again later',
+  },
 });
 
 // POST /api/v1/recipes/extract - Extract recipe from URL
@@ -36,47 +39,21 @@ router.post(
 );
 
 // POST /api/v1/recipes - Save a recipe
-router.post(
-  '/',
-  authenticateToken,
-  validate(saveRecipeSchema),
-  saveRecipe
-);
+router.post('/', authenticateToken, validate(saveRecipeSchema), saveRecipe);
 
 // GET /api/v1/recipes - Get all recipes for user
-router.get(
-  '/',
-  authenticateToken,
-  getRecipes
-);
+router.get('/', authenticateToken, getRecipes);
 
 // GET /api/v1/recipes/:id - Get a single recipe
-router.get(
-  '/:id',
-  authenticateToken,
-  getRecipe
-);
+router.get('/:id', authenticateToken, getRecipe);
 
 // GET /api/v1/recipes/:id/scaled - Get a scaled version of a recipe
-router.get(
-  '/:id/scaled',
-  authenticateToken,
-  getScaledRecipe
-);
+router.get('/:id/scaled', authenticateToken, getScaledRecipe);
 
 // PUT /api/v1/recipes/:id - Update a recipe
-router.put(
-  '/:id',
-  authenticateToken,
-  validate(updateRecipeSchema),
-  updateRecipe
-);
+router.put('/:id', authenticateToken, validate(updateRecipeSchema), updateRecipe);
 
 // DELETE /api/v1/recipes/:id - Delete a recipe
-router.delete(
-  '/:id',
-  authenticateToken,
-  deleteRecipe
-);
+router.delete('/:id', authenticateToken, deleteRecipe);
 
 module.exports = router;

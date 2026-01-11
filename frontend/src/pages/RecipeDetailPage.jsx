@@ -125,7 +125,7 @@ export default function RecipeDetailPage() {
       0.625: '⅝',
       0.666: '⅔',
       0.75: '¾',
-      0.875: '⅞'
+      0.875: '⅞',
     };
 
     const whole = Math.floor(qty);
@@ -171,8 +171,13 @@ export default function RecipeDetailPage() {
 
       return (
         <span>
-          <span className="font-semibold text-primary-700">{displayQty} {unit}</span> {name}
-          <span className="text-xs text-gray-500 ml-2">(originally {originalDisplay} {unit})</span>
+          <span className="font-semibold text-primary-700">
+            {displayQty} {unit}
+          </span>{' '}
+          {name}
+          <span className="text-xs text-gray-500 ml-2">
+            (originally {originalDisplay} {unit})
+          </span>
         </span>
       );
     }
@@ -210,7 +215,7 @@ export default function RecipeDetailPage() {
       // Prepare recipe data with scaled servings if applicable
       const recipeData = {
         recipeId: id,
-        scaledServings: recipe.isScaled ? currentServings : null
+        scaledServings: recipe.isScaled ? currentServings : null,
       };
 
       if (selection.isNewList) {
@@ -260,7 +265,7 @@ export default function RecipeDetailPage() {
         recipeData={{
           defaultName: recipe.isScaled
             ? `${recipe.title} (${currentServings} servings)`
-            : recipe.title
+            : recipe.title,
         }}
       />
 
@@ -285,9 +290,7 @@ export default function RecipeDetailPage() {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h1 className="text-4xl font-bold text-gray-900 mb-2">{recipe.title}</h1>
-            {recipe.description && (
-              <p className="text-gray-600 text-lg">{recipe.description}</p>
-            )}
+            {recipe.description && <p className="text-gray-600 text-lg">{recipe.description}</p>}
           </div>
           <div className="flex gap-2">
             <Button
@@ -296,7 +299,9 @@ export default function RecipeDetailPage() {
               className="flex items-center gap-2"
             >
               <ShoppingCartIcon className="w-5 h-5" />
-              {recipe.isScaled ? `Add to List (${currentServings} servings)` : 'Add to Shopping List'}
+              {recipe.isScaled
+                ? `Add to List (${currentServings} servings)`
+                : 'Add to Shopping List'}
             </Button>
             <Button variant="secondary" onClick={handleDelete} loading={deleting}>
               Delete
@@ -309,33 +314,61 @@ export default function RecipeDetailPage() {
           {recipe.prepTime && (
             <div className="flex items-center text-gray-600">
               <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
-              <span><strong>Prep:</strong> {recipe.prepTime}</span>
+              <span>
+                <strong>Prep:</strong> {recipe.prepTime}
+              </span>
             </div>
           )}
           {recipe.cookTime && (
             <div className="flex items-center text-gray-600">
               <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z"
+                />
               </svg>
-              <span><strong>Cook:</strong> {recipe.cookTime}</span>
+              <span>
+                <strong>Cook:</strong> {recipe.cookTime}
+              </span>
             </div>
           )}
           {recipe.totalTime && (
             <div className="flex items-center text-gray-600">
               <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
               </svg>
-              <span><strong>Total:</strong> {recipe.totalTime}</span>
+              <span>
+                <strong>Total:</strong> {recipe.totalTime}
+              </span>
             </div>
           )}
           {recipe.servings && (
             <div className="flex items-center text-gray-600">
               <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                />
               </svg>
-              <span><strong>Servings:</strong> {recipe.servings}</span>
+              <span>
+                <strong>Servings:</strong> {recipe.servings}
+              </span>
             </div>
           )}
         </div>
@@ -402,14 +435,15 @@ export default function RecipeDetailPage() {
             </div>
 
             {scalingError && (
-              <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">
-                {scalingError}
-              </div>
+              <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">{scalingError}</div>
             )}
 
             {recipe.isScaled && (
               <div className="mt-3 text-xs text-blue-800 bg-blue-100 p-2 rounded-lg">
-                💡 <strong>Tip:</strong> Ingredient quantities have been automatically adjusted. Scaled amounts are shown in <span className="font-semibold text-primary-700">bold</span> with original amounts in gray.
+                💡 <strong>Tip:</strong> Ingredient quantities have been automatically adjusted.
+                Scaled amounts are shown in{' '}
+                <span className="font-semibold text-primary-700">bold</span> with original amounts
+                in gray.
               </div>
             )}
           </div>
@@ -439,13 +473,8 @@ export default function RecipeDetailPage() {
             <ul className="space-y-2">
               {recipe.ingredients.map((ingredient, index) => (
                 <li key={ingredient.id || index} className="flex items-start">
-                  <input
-                    type="checkbox"
-                    className="mt-1 mr-3 h-4 w-4 text-primary-600 rounded"
-                  />
-                  <span className="text-gray-700">
-                    {formatQuantity(ingredient)}
-                  </span>
+                  <input type="checkbox" className="mt-1 mr-3 h-4 w-4 text-primary-600 rounded" />
+                  <span className="text-gray-700">{formatQuantity(ingredient)}</span>
                 </li>
               ))}
             </ul>
@@ -460,9 +489,7 @@ export default function RecipeDetailPage() {
                   <span className="flex-shrink-0 w-8 h-8 bg-primary-600 text-white rounded-full flex items-center justify-center font-semibold mr-4">
                     {instruction.stepNumber || index + 1}
                   </span>
-                  <p className="text-gray-700 pt-1">
-                    {instruction.instructionText || instruction}
-                  </p>
+                  <p className="text-gray-700 pt-1">{instruction.instructionText || instruction}</p>
                 </li>
               ))}
             </ol>

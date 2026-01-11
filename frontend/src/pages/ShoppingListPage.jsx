@@ -36,9 +36,9 @@ export default function ShoppingListPage() {
     try {
       await shoppingLists.updateItem(itemId, { isChecked: !currentStatus });
       // Update local state
-      setItems(items.map(item =>
-        item.id === itemId ? { ...item, is_checked: !currentStatus } : item
-      ));
+      setItems(
+        items.map((item) => (item.id === itemId ? { ...item, is_checked: !currentStatus } : item))
+      );
     } catch (err) {
       setError('Failed to update item');
     }
@@ -48,9 +48,9 @@ export default function ShoppingListPage() {
     try {
       await shoppingLists.updateItem(itemId, { category: newCategory });
       // Update local state
-      setItems(items.map(item =>
-        item.id === itemId ? { ...item, category: newCategory } : item
-      ));
+      setItems(
+        items.map((item) => (item.id === itemId ? { ...item, category: newCategory } : item))
+      );
     } catch (err) {
       setError('Failed to update category');
     }
@@ -94,7 +94,7 @@ export default function ShoppingListPage() {
     'Condiments & Sauces',
     'Beverages',
     'Snacks',
-    'Other'
+    'Other',
   ];
 
   // Group items by category
@@ -108,7 +108,7 @@ export default function ShoppingListPage() {
   }, {});
 
   // Calculate overall progress
-  const checkedCount = items.filter(item => item.is_checked).length;
+  const checkedCount = items.filter((item) => item.is_checked).length;
   const totalCount = items.length;
 
   if (loading) {
@@ -158,108 +158,112 @@ export default function ShoppingListPage() {
               </div>
             </div>
 
-        {error && (
-          <div className="rounded-md bg-red-50 p-4">
-            <p className="text-sm text-red-800">{error}</p>
-          </div>
-        )}
+            {error && (
+              <div className="rounded-md bg-red-50 p-4">
+                <p className="text-sm text-red-800">{error}</p>
+              </div>
+            )}
 
-        {/* Progress Bar */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-700">Progress</span>
-            <span className="text-sm text-gray-600">
-              {totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0}%
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
-            <div
-              className="bg-primary-600 h-2 rounded-full transition-all"
-              style={{ width: `${totalCount > 0 ? (checkedCount / totalCount) * 100 : 0}%` }}
-            />
-          </div>
-        </div>
-
-        {/* Shopping List Items - Grouped by Category */}
-        <div className="space-y-6">
-          {items.length === 0 ? (
+            {/* Progress Bar */}
             <div className="card">
-              <p className="text-gray-500 text-center py-8">No items in this shopping list</p>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-gray-700">Progress</span>
+                <span className="text-sm text-gray-600">
+                  {totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0}%
+                </span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-primary-600 h-2 rounded-full transition-all"
+                  style={{ width: `${totalCount > 0 ? (checkedCount / totalCount) * 100 : 0}%` }}
+                />
+              </div>
             </div>
-          ) : (
-            CATEGORY_ORDER.map((category) => {
-              const categoryItems = groupedItems[category];
 
-              // Skip empty categories
-              if (!categoryItems || categoryItems.length === 0) {
-                return null;
-              }
-
-              const categoryChecked = categoryItems.filter(item => item.is_checked).length;
-              const categoryTotal = categoryItems.length;
-
-              return (
-                <div key={category} className="card">
-                  {/* Category Header */}
-                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                    <h3 className="text-lg font-semibold text-gray-900">{category}</h3>
-                    <span className="text-sm text-gray-600">
-                      {categoryChecked}/{categoryTotal} items
-                    </span>
-                  </div>
-
-                  {/* Category Items */}
-                  <div className="space-y-2">
-                    {categoryItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                          item.is_checked
-                            ? 'bg-gray-50 border-gray-200'
-                            : 'bg-white border-gray-300 hover:border-primary-300'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={item.is_checked}
-                          onChange={() => toggleItemChecked(item.id, item.is_checked)}
-                          className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <div className={`font-medium flex-1 ${item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'}`}>
-                              {item.ingredient_name}
-                            </div>
-                            <select
-                              value={item.category || 'Other'}
-                              onChange={(e) => updateItemCategory(item.id, e.target.value)}
-                              className="text-xs px-2 py-1 border border-gray-300 rounded bg-white hover:border-primary-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              {CATEGORY_ORDER.map(cat => (
-                                <option key={cat} value={cat}>{cat}</option>
-                              ))}
-                            </select>
-                          </div>
-                          {(item.quantity || item.unit) && (
-                            <div className={`text-sm ${item.is_checked ? 'text-gray-400' : 'text-gray-600'}`}>
-                              {formatQuantity(item.quantity, item.unit)}
-                            </div>
-                          )}
-                          {item.notes && (
-                            <div className="text-sm text-gray-500 mt-1">
-                              {item.notes}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+            {/* Shopping List Items - Grouped by Category */}
+            <div className="space-y-6">
+              {items.length === 0 ? (
+                <div className="card">
+                  <p className="text-gray-500 text-center py-8">No items in this shopping list</p>
                 </div>
-              );
-            })
-          )}
-        </div>
+              ) : (
+                CATEGORY_ORDER.map((category) => {
+                  const categoryItems = groupedItems[category];
+
+                  // Skip empty categories
+                  if (!categoryItems || categoryItems.length === 0) {
+                    return null;
+                  }
+
+                  const categoryChecked = categoryItems.filter((item) => item.is_checked).length;
+                  const categoryTotal = categoryItems.length;
+
+                  return (
+                    <div key={category} className="card">
+                      {/* Category Header */}
+                      <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-900">{category}</h3>
+                        <span className="text-sm text-gray-600">
+                          {categoryChecked}/{categoryTotal} items
+                        </span>
+                      </div>
+
+                      {/* Category Items */}
+                      <div className="space-y-2">
+                        {categoryItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                              item.is_checked
+                                ? 'bg-gray-50 border-gray-200'
+                                : 'bg-white border-gray-300 hover:border-primary-300'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={item.is_checked}
+                              onChange={() => toggleItemChecked(item.id, item.is_checked)}
+                              className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className={`font-medium flex-1 ${item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'}`}
+                                >
+                                  {item.ingredient_name}
+                                </div>
+                                <select
+                                  value={item.category || 'Other'}
+                                  onChange={(e) => updateItemCategory(item.id, e.target.value)}
+                                  className="text-xs px-2 py-1 border border-gray-300 rounded bg-white hover:border-primary-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {CATEGORY_ORDER.map((cat) => (
+                                    <option key={cat} value={cat}>
+                                      {cat}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              {(item.quantity || item.unit) && (
+                                <div
+                                  className={`text-sm ${item.is_checked ? 'text-gray-400' : 'text-gray-600'}`}
+                                >
+                                  {formatQuantity(item.quantity, item.unit)}
+                                </div>
+                              )}
+                              {item.notes && (
+                                <div className="text-sm text-gray-500 mt-1">{item.notes}</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
 
             {/* Tips */}
             <div className="card bg-blue-50 border-blue-200">
@@ -281,11 +285,7 @@ export default function ShoppingListPage() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Recipes in this list</h3>
                   <div className="space-y-3">
                     {recipes.map((recipe) => (
-                      <Link
-                        key={recipe.id}
-                        to={`/recipes/${recipe.id}`}
-                        className="block group"
-                      >
+                      <Link key={recipe.id} to={`/recipes/${recipe.id}`} className="block group">
                         <div className="flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
                           {recipe.image_url && (
                             <img

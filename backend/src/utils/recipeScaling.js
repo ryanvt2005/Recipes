@@ -19,13 +19,13 @@ function parseServings(servingsStr) {
 
   // Match patterns like: "4", "4 servings", "serves 4", "4-6", "4 to 6", "makes 12", etc.
   const patterns = [
-    /^(\d+)$/,                           // "4"
-    /^(\d+)\s*servings?$/,               // "4 servings" or "4 serving(s)"
-    /^serves?\s*(\d+)/,                  // "serves 4"
-    /^makes?\s*(\d+)/,                   // "makes 12" or "makes 15-18 truffles"
-    /^(\d+)\s*[-to]\s*\d+/,             // "4-6" or "4 to 6" - take first number
+    /^(\d+)$/, // "4"
+    /^(\d+)\s*servings?$/, // "4 servings" or "4 serving(s)"
+    /^serves?\s*(\d+)/, // "serves 4"
+    /^makes?\s*(\d+)/, // "makes 12" or "makes 15-18 truffles"
+    /^(\d+)\s*[-to]\s*\d+/, // "4-6" or "4 to 6" - take first number
     /^(\d+)\s*[-to]\s*\d+\s*servings?/, // "4-6 servings"
-    /(\d+)\s*serving/,                   // fallback: any number before "serving"
+    /(\d+)\s*serving/, // fallback: any number before "serving"
   ];
 
   for (const pattern of patterns) {
@@ -59,18 +59,18 @@ function scaleRecipe(recipe, targetServings) {
     return {
       ...recipe,
       scalingError: `Cannot scale recipe: original servings not specified or invalid. Current value: "${recipe.servings || '(empty)'}"`,
-      canScale: false
+      canScale: false,
     };
   }
 
   const scaleFactor = targetServings / originalServings;
 
   // Scale ingredients
-  const scaledIngredients = recipe.ingredients.map(ingredient => ({
+  const scaledIngredients = recipe.ingredients.map((ingredient) => ({
     ...ingredient,
     quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : null,
     originalQuantity: ingredient.quantity,
-    scaled: ingredient.quantity ? true : false
+    scaled: ingredient.quantity ? true : false,
   }));
 
   return {
@@ -80,7 +80,7 @@ function scaleRecipe(recipe, targetServings) {
     scaleFactor: scaleFactor,
     ingredients: scaledIngredients,
     canScale: true,
-    isScaled: scaleFactor !== 1
+    isScaled: scaleFactor !== 1,
   };
 }
 
@@ -94,7 +94,7 @@ function decimalToFraction(decimal) {
     return '0';
   }
 
-  const tolerance = 1.0E-6;
+  const tolerance = 1.0e-6;
   const whole = Math.floor(decimal);
   const fraction = decimal - whole;
 
@@ -143,7 +143,7 @@ function formatScaledQuantity(quantity, originalQuantity) {
   return {
     display: scaledDisplay,
     original: originalDisplay,
-    showOriginal: originalQuantity && Math.abs(quantity - originalQuantity) > 0.01
+    showOriginal: originalQuantity && Math.abs(quantity - originalQuantity) > 0.01,
   };
 }
 
@@ -151,5 +151,5 @@ module.exports = {
   parseServings,
   scaleRecipe,
   decimalToFraction,
-  formatScaledQuantity
+  formatScaledQuantity,
 };

@@ -11,15 +11,12 @@ async function register(req, res) {
 
   try {
     // Check if user already exists
-    const existingUser = await pool.query(
-      'SELECT id FROM users WHERE email = $1',
-      [email]
-    );
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
 
     if (existingUser.rows.length > 0) {
       return res.status(409).json({
         error: 'User already exists',
-        message: 'A user with this email address already exists'
+        message: 'A user with this email address already exists',
       });
     }
 
@@ -47,15 +44,15 @@ async function register(req, res) {
         id: user.id,
         email: user.email,
         firstName: user.first_name,
-        lastName: user.last_name
+        lastName: user.last_name,
       },
-      token
+      token,
     });
   } catch (error) {
     logger.error('Registration error', { error: error.message });
     res.status(500).json({
       error: 'Registration failed',
-      message: 'An error occurred during registration'
+      message: 'An error occurred during registration',
     });
   }
 }
@@ -76,7 +73,7 @@ async function login(req, res) {
     if (result.rows.length === 0) {
       return res.status(401).json({
         error: 'Invalid credentials',
-        message: 'Email or password is incorrect'
+        message: 'Email or password is incorrect',
       });
     }
 
@@ -88,7 +85,7 @@ async function login(req, res) {
     if (!isPasswordValid) {
       return res.status(401).json({
         error: 'Invalid credentials',
-        message: 'Email or password is incorrect'
+        message: 'Email or password is incorrect',
       });
     }
 
@@ -102,20 +99,20 @@ async function login(req, res) {
         id: user.id,
         email: user.email,
         firstName: user.first_name,
-        lastName: user.last_name
+        lastName: user.last_name,
       },
-      token
+      token,
     });
   } catch (error) {
     logger.error('Login error', { error: error.message });
     res.status(500).json({
       error: 'Login failed',
-      message: 'An error occurred during login'
+      message: 'An error occurred during login',
     });
   }
 }
 
 module.exports = {
   register,
-  login
+  login,
 };

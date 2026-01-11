@@ -29,15 +29,15 @@ function authenticateToken(req, res, next) {
 function generateToken(user) {
   const payload = {
     userId: user.id,
-    email: user.email
+    email: user.email,
   };
 
   return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: '7d'
+    expiresIn: '7d',
   });
 }
 
 module.exports = {
   authenticateToken,
-  generateToken
+  generateToken,
 };

@@ -25,7 +25,7 @@ export default function AddRecipePage() {
       servings: '',
       imageUrl: '',
       ingredients: [{ rawText: '', ingredient: '' }],
-      instructions: ['']
+      instructions: [''],
     });
     setMode('manual');
   };
@@ -66,16 +66,16 @@ export default function AddRecipePage() {
           : extractedRecipe.servings,
         // Ensure all ingredients have both rawText and ingredient fields
         // Remove sortOrder field as it's not allowed by validation
-        ingredients: extractedRecipe.ingredients.map(ing => {
+        ingredients: extractedRecipe.ingredients.map((ing) => {
           const { sortOrder, ...rest } = ing; // eslint-disable-line no-unused-vars
           return {
             ...rest,
             rawText: rest.rawText || rest.ingredient || '',
-            ingredient: rest.ingredient || rest.rawText || ''
+            ingredient: rest.ingredient || rest.rawText || '',
           };
         }),
         // Filter out any empty instructions
-        instructions: extractedRecipe.instructions.filter(inst => inst && inst.trim())
+        instructions: extractedRecipe.instructions.filter((inst) => inst && inst.trim()),
       };
 
       // Remove fields that aren't allowed by backend validation
@@ -101,7 +101,7 @@ export default function AddRecipePage() {
       ...newIngredients[index],
       [field]: value,
       // If updating rawText, also update ingredient field
-      ...(field === 'rawText' ? { ingredient: value } : {})
+      ...(field === 'rawText' ? { ingredient: value } : {}),
     };
     setExtractedRecipe({ ...extractedRecipe, ingredients: newIngredients });
   };
@@ -115,7 +115,7 @@ export default function AddRecipePage() {
   const addIngredient = () => {
     setExtractedRecipe({
       ...extractedRecipe,
-      ingredients: [...extractedRecipe.ingredients, { rawText: '', ingredient: '' }]
+      ingredients: [...extractedRecipe.ingredients, { rawText: '', ingredient: '' }],
     });
   };
 
@@ -127,7 +127,7 @@ export default function AddRecipePage() {
   const addInstruction = () => {
     setExtractedRecipe({
       ...extractedRecipe,
-      instructions: [...extractedRecipe.instructions, '']
+      instructions: [...extractedRecipe.instructions, ''],
     });
   };
 
@@ -164,9 +164,7 @@ export default function AddRecipePage() {
                 }`}
               >
                 <div className="text-lg font-semibold mb-2">✏️ Enter Manually</div>
-                <p className="text-sm text-gray-600">
-                  Type in your recipe details by hand
-                </p>
+                <p className="text-sm text-gray-600">Type in your recipe details by hand</p>
               </button>
             </div>
           </div>

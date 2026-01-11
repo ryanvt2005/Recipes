@@ -56,7 +56,9 @@ export default function Layout({ children }) {
                         <Menu.Item>
                           {() => (
                             <div className="px-4 py-2 text-sm text-gray-700 border-b">
-                              <div className="font-medium">{user.firstName} {user.lastName}</div>
+                              <div className="font-medium">
+                                {user.firstName} {user.lastName}
+                              </div>
                               <div className="text-gray-500 text-xs">{user.email}</div>
                             </div>
                           )}
@@ -85,10 +87,7 @@ export default function Layout({ children }) {
                   >
                     Login
                   </Link>
-                  <Link
-                    to="/register"
-                    className="btn btn-primary text-sm"
-                  >
+                  <Link to="/register" className="btn btn-primary text-sm">
                     Sign Up
                   </Link>
                 </>
@@ -99,9 +98,7 @@ export default function Layout({ children }) {
       </header>
 
       <main className="flex-1">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</div>
       </main>
 
       <footer className="bg-white border-t border-gray-200 mt-auto">

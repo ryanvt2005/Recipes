@@ -31,7 +31,7 @@ export default function ShoppingListsPage() {
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
     });
   };
 
@@ -64,9 +64,7 @@ export default function ShoppingListsPage() {
         {lists.length === 0 ? (
           <div className="card text-center py-12">
             <div className="text-6xl mb-4">🛒</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              No Shopping Lists Yet
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-2">No Shopping Lists Yet</h2>
             <p className="text-gray-600 mb-6">
               Create your first shopping list by selecting recipes from your collection
             </p>
@@ -84,9 +82,7 @@ export default function ShoppingListsPage() {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      {list.name}
-                    </h3>
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{list.name}</h3>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
                       <span className="flex items-center gap-1">
                         <svg

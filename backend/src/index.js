@@ -17,22 +17,26 @@ app.use(helmet());
 const allowedOrigins = [
   'http://localhost:3001',
   'http://127.0.0.1:3001',
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
 ].filter(Boolean); // Remove any undefined values
 
-app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) {return callback(null, true);}
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) {
+        return callback(null, true);
+      }
 
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
-}));
+      if (allowedOrigins.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
+  })
+);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
@@ -41,7 +45,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path}`, {
     ip: req.ip,
-    userAgent: req.get('user-agent')
+    userAgent: req.get('user-agent'),
   });
   next();
 });
@@ -51,7 +55,7 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
   });
 });
 
@@ -64,7 +68,7 @@ app.use('/api/v1/shopping-lists', shoppingListRoutes);
 app.use((req, res) => {
   res.status(404).json({
     error: 'NOT_FOUND',
-    message: 'The requested resource was not found'
+    message: 'The requested resource was not found',
   });
 });
 
@@ -73,14 +77,13 @@ app.use((err, req, res, _next) => {
   logger.error('Unhandled error', {
     error: err.message,
     stack: err.stack,
-    path: req.path
+    path: req.path,
   });
 
   res.status(err.status || 500).json({
     error: 'INTERNAL_SERVER_ERROR',
-    message: process.env.NODE_ENV === 'production'
-      ? 'An internal server error occurred'
-      : err.message
+    message:
+      process.env.NODE_ENV === 'production' ? 'An internal server error occurred' : err.message,
   });
 });
 

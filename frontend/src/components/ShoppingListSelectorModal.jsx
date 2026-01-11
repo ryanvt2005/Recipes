@@ -40,7 +40,7 @@ export default function ShoppingListSelectorModal({ isOpen, onClose, onConfirm, 
     onConfirm({
       listId: selectedListId === 'new' ? null : selectedListId,
       listName: selectedListId === 'new' ? newListName.trim() : null,
-      isNewList: selectedListId === 'new'
+      isNewList: selectedListId === 'new',
     });
 
     // Reset state
@@ -59,15 +59,19 @@ export default function ShoppingListSelectorModal({ isOpen, onClose, onConfirm, 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={handleClose}>
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+      onClick={handleClose}
+    >
+      <div
+        className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="p-6 overflow-y-auto flex-1">
           <h2 className="text-2xl font-bold mb-4">Add to Shopping List</h2>
 
           {error && (
-            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">
-              {error}
-            </div>
+            <div className="mb-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>
           )}
 
           {loading ? (
@@ -134,24 +138,15 @@ export default function ShoppingListSelectorModal({ isOpen, onClose, onConfirm, 
               )}
             </div>
           )}
-
         </div>
 
         {/* Action Buttons - Fixed at bottom */}
         <div className="p-6 pt-0 border-t bg-gray-50 rounded-b-lg">
           <div className="flex gap-3">
-            <Button
-              variant="secondary"
-              onClick={handleClose}
-              className="flex-1"
-            >
+            <Button variant="secondary" onClick={handleClose} className="flex-1">
               Cancel
             </Button>
-            <Button
-              onClick={handleConfirm}
-              disabled={loading}
-              className="flex-1"
-            >
+            <Button onClick={handleConfirm} disabled={loading} className="flex-1">
               Add to List
             </Button>
           </div>

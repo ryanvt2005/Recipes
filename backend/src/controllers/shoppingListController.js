@@ -7,7 +7,9 @@ const { categorizeIngredient } = require('../utils/ingredientCategorizer');
  * Handles fractions like "1/2", "1 1/2", decimals, and ranges
  */
 function parseQuantity(quantityStr) {
-  if (!quantityStr) {return null;}
+  if (!quantityStr) {
+    return null;
+  }
 
   // Remove extra whitespace
   quantityStr = quantityStr.trim();
@@ -18,7 +20,7 @@ function parseQuantity(quantityStr) {
     const whole = parseInt(fractionMatch[1]) || 0;
     const numerator = parseInt(fractionMatch[2]);
     const denominator = parseInt(fractionMatch[3]);
-    return whole + (numerator / denominator);
+    return whole + numerator / denominator;
   }
 
   // Handle ranges like "2-3" - take the average
@@ -40,39 +42,82 @@ function parseQuantity(quantityStr) {
  * Normalize unit names to standard forms
  */
 function normalizeUnit(unit) {
-  if (!unit) {return null;}
+  if (!unit) {
+    return null;
+  }
 
   const unitMap = {
     // Volume
-    'cup': 'cup', 'cups': 'cup', 'c': 'cup',
-    'tablespoon': 'tbsp', 'tablespoons': 'tbsp', 'tbsp': 'tbsp', 'T': 'tbsp',
-    'teaspoon': 'tsp', 'teaspoons': 'tsp', 'tsp': 'tsp', 't': 'tsp',
-    'fluid ounce': 'fl oz', 'fluid ounces': 'fl oz', 'fl oz': 'fl oz',
-    'pint': 'pint', 'pints': 'pint', 'pt': 'pint',
-    'quart': 'quart', 'quarts': 'quart', 'qt': 'quart',
-    'gallon': 'gallon', 'gallons': 'gallon', 'gal': 'gallon',
-    'milliliter': 'ml', 'milliliters': 'ml', 'ml': 'ml',
-    'liter': 'l', 'liters': 'l', 'l': 'l',
+    cup: 'cup',
+    cups: 'cup',
+    c: 'cup',
+    tablespoon: 'tbsp',
+    tablespoons: 'tbsp',
+    tbsp: 'tbsp',
+    T: 'tbsp',
+    teaspoon: 'tsp',
+    teaspoons: 'tsp',
+    tsp: 'tsp',
+    t: 'tsp',
+    'fluid ounce': 'fl oz',
+    'fluid ounces': 'fl oz',
+    'fl oz': 'fl oz',
+    pint: 'pint',
+    pints: 'pint',
+    pt: 'pint',
+    quart: 'quart',
+    quarts: 'quart',
+    qt: 'quart',
+    gallon: 'gallon',
+    gallons: 'gallon',
+    gal: 'gallon',
+    milliliter: 'ml',
+    milliliters: 'ml',
+    ml: 'ml',
+    liter: 'l',
+    liters: 'l',
+    l: 'l',
 
     // Weight
-    'pound': 'lb', 'pounds': 'lb', 'lb': 'lb', 'lbs': 'lb',
-    'ounce': 'oz', 'ounces': 'oz', 'oz': 'oz',
-    'gram': 'g', 'grams': 'g', 'g': 'g',
-    'kilogram': 'kg', 'kilograms': 'kg', 'kg': 'kg',
+    pound: 'lb',
+    pounds: 'lb',
+    lb: 'lb',
+    lbs: 'lb',
+    ounce: 'oz',
+    ounces: 'oz',
+    oz: 'oz',
+    gram: 'g',
+    grams: 'g',
+    g: 'g',
+    kilogram: 'kg',
+    kilograms: 'kg',
+    kg: 'kg',
 
     // Count
-    'piece': 'piece', 'pieces': 'piece',
-    'whole': 'whole',
-    'can': 'can', 'cans': 'can',
-    'package': 'package', 'packages': 'package', 'pkg': 'package',
-    'jar': 'jar', 'jars': 'jar',
-    'bottle': 'bottle', 'bottles': 'bottle',
-    'box': 'box', 'boxes': 'box',
-    'bunch': 'bunch', 'bunches': 'bunch',
-    'clove': 'clove', 'cloves': 'clove',
-    'slice': 'slice', 'slices': 'slice',
-    'stalk': 'stalk', 'stalks': 'stalk',
-    'stick': 'stick', 'sticks': 'stick'
+    piece: 'piece',
+    pieces: 'piece',
+    whole: 'whole',
+    can: 'can',
+    cans: 'can',
+    package: 'package',
+    packages: 'package',
+    pkg: 'package',
+    jar: 'jar',
+    jars: 'jar',
+    bottle: 'bottle',
+    bottles: 'bottle',
+    box: 'box',
+    boxes: 'box',
+    bunch: 'bunch',
+    bunches: 'bunch',
+    clove: 'clove',
+    cloves: 'clove',
+    slice: 'slice',
+    slices: 'slice',
+    stalk: 'stalk',
+    stalks: 'stalk',
+    stick: 'stick',
+    sticks: 'stick',
   };
 
   const normalized = unit.toLowerCase().trim();
@@ -93,14 +138,14 @@ function parseIngredient(rawText, ingredientName) {
       return {
         quantity: parseQuantity(match[1]),
         unit: normalizeUnit(match[2]),
-        name: ingredientName.trim().toLowerCase()
+        name: ingredientName.trim().toLowerCase(),
       };
     }
 
     return {
       quantity: null,
       unit: null,
-      name: ingredientName.trim().toLowerCase()
+      name: ingredientName.trim().toLowerCase(),
     };
   }
 
@@ -112,7 +157,7 @@ function parseIngredient(rawText, ingredientName) {
     return {
       quantity: parseQuantity(match[1]),
       unit: normalizeUnit(match[2]),
-      name: match[3].trim().toLowerCase()
+      name: match[3].trim().toLowerCase(),
     };
   }
 
@@ -120,7 +165,7 @@ function parseIngredient(rawText, ingredientName) {
   return {
     quantity: null,
     unit: null,
-    name: rawText.trim().toLowerCase()
+    name: rawText.trim().toLowerCase(),
   };
 }
 
@@ -131,7 +176,7 @@ function parseIngredient(rawText, ingredientName) {
 function consolidateIngredients(recipeIngredients) {
   const consolidated = {};
 
-  recipeIngredients.forEach(ing => {
+  recipeIngredients.forEach((ing) => {
     const parsed = parseIngredient(ing.raw_text, ing.ingredient_name);
 
     // Create a key based on ingredient name and unit
@@ -149,7 +194,7 @@ function consolidateIngredients(recipeIngredients) {
         ingredient_name: parsed.name,
         quantity: parsed.quantity,
         unit: parsed.unit,
-        category: categorizeIngredient(parsed.name)
+        category: categorizeIngredient(parsed.name),
       };
     }
   });
@@ -176,14 +221,14 @@ async function createFromRecipes(req, res) {
     }
 
     // Parse recipeIds - support both string array and object array
-    const recipeData = recipeIds.map(item => {
+    const recipeData = recipeIds.map((item) => {
       if (typeof item === 'string') {
         return { recipeId: item, scaledServings: null };
       }
       return { recipeId: item.recipeId, scaledServings: item.scaledServings || null };
     });
 
-    const justIds = recipeData.map(r => r.recipeId);
+    const justIds = recipeData.map((r) => r.recipeId);
 
     // Get all ingredients AND original servings from selected recipes
     const ingredientsResult = await pool.query(
@@ -200,8 +245,8 @@ async function createFromRecipes(req, res) {
     }
 
     // Scale ingredients if needed
-    const scaledIngredients = ingredientsResult.rows.map(ingredient => {
-      const recipeInfo = recipeData.find(r => r.recipeId === ingredient.recipe_id);
+    const scaledIngredients = ingredientsResult.rows.map((ingredient) => {
+      const recipeInfo = recipeData.find((r) => r.recipeId === ingredient.recipe_id);
 
       if (!recipeInfo || !recipeInfo.scaledServings) {
         // No scaling needed
@@ -221,7 +266,7 @@ async function createFromRecipes(req, res) {
 
       return {
         ...ingredient,
-        quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity
+        quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity,
       };
     });
 
@@ -245,22 +290,15 @@ async function createFromRecipes(req, res) {
          (shopping_list_id, ingredient_name, quantity, unit, category, sort_order)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [
-          shoppingList.id,
-          item.ingredient_name,
-          item.quantity,
-          item.unit,
-          item.category,
-          index
-        ]
+        [shoppingList.id, item.ingredient_name, item.quantity, item.unit, item.category, index]
       );
     });
 
     const itemResults = await Promise.all(itemPromises);
-    const items = itemResults.map(r => r.rows[0]);
+    const items = itemResults.map((r) => r.rows[0]);
 
     // Track which recipes were included in this shopping list
-    const recipeAssociationPromises = recipeData.map(recipe => {
+    const recipeAssociationPromises = recipeData.map((recipe) => {
       return pool.query(
         `INSERT INTO shopping_list_recipes
          (shopping_list_id, recipe_id, scaled_servings)
@@ -276,15 +314,14 @@ async function createFromRecipes(req, res) {
       userId,
       listId: shoppingList.id,
       recipeCount: recipeIds.length,
-      itemCount: items.length
+      itemCount: items.length,
     });
 
     res.status(201).json({
       shoppingList,
       items,
-      message: `Shopping list created with ${items.length} consolidated items`
+      message: `Shopping list created with ${items.length} consolidated items`,
     });
-
   } catch (error) {
     console.error('=== SHOPPING LIST ERROR ===');
     console.error('Message:', error.message);
@@ -297,7 +334,7 @@ async function createFromRecipes(req, res) {
       error: error.message,
       stack: error.stack,
       userId,
-      recipeIds
+      recipeIds,
     });
     res.status(500).json({ error: 'Failed to create shopping list' });
   }
@@ -321,7 +358,6 @@ async function getUserShoppingLists(req, res) {
     );
 
     res.json({ shoppingLists: result.rows });
-
   } catch (error) {
     logger.error('Error fetching shopping lists', { error: error.message });
     res.status(500).json({ error: 'Failed to fetch shopping lists' });
@@ -367,9 +403,8 @@ async function getShoppingList(req, res) {
     res.json({
       shoppingList: listResult.rows[0],
       items: itemsResult.rows,
-      recipes: recipesResult.rows
+      recipes: recipesResult.rows,
     });
-
   } catch (error) {
     logger.error('Error fetching shopping list', { error: error.message });
     res.status(500).json({ error: 'Failed to fetch shopping list' });
@@ -407,7 +442,7 @@ async function updateItem(req, res) {
         logger.info('Category override recorded', {
           ingredient: item.ingredient_name,
           oldCategory: item.category,
-          newCategory: category
+          newCategory: category,
         });
       } catch (error) {
         logger.error('Failed to record category override', { error: error.message });
@@ -427,7 +462,6 @@ async function updateItem(req, res) {
     );
 
     res.json({ item: result.rows[0] });
-
   } catch (error) {
     logger.error('Error updating shopping list item', { error: error.message });
     res.status(500).json({ error: 'Failed to update item' });
@@ -453,7 +487,6 @@ async function deleteShoppingList(req, res) {
 
     logger.info('Shopping list deleted', { userId, listId: id });
     res.json({ message: 'Shopping list deleted successfully' });
-
   } catch (error) {
     logger.error('Error deleting shopping list', { error: error.message });
     res.status(500).json({ error: 'Failed to delete shopping list' });
@@ -485,14 +518,14 @@ async function addRecipesToList(req, res) {
     }
 
     // Parse recipeIds - support both string array and object array
-    const recipeData = recipeIds.map(item => {
+    const recipeData = recipeIds.map((item) => {
       if (typeof item === 'string') {
         return { recipeId: item, scaledServings: null };
       }
       return { recipeId: item.recipeId, scaledServings: item.scaledServings || null };
     });
 
-    const justIds = recipeData.map(r => r.recipeId);
+    const justIds = recipeData.map((r) => r.recipeId);
 
     // Get ingredients AND original servings
     const ingredientsResult = await pool.query(
@@ -509,8 +542,8 @@ async function addRecipesToList(req, res) {
     }
 
     // Scale ingredients if needed
-    const scaledIngredients = ingredientsResult.rows.map(ingredient => {
-      const recipeInfo = recipeData.find(r => r.recipeId === ingredient.recipe_id);
+    const scaledIngredients = ingredientsResult.rows.map((ingredient) => {
+      const recipeInfo = recipeData.find((r) => r.recipeId === ingredient.recipe_id);
 
       if (!recipeInfo || !recipeInfo.scaledServings) {
         return ingredient;
@@ -527,7 +560,7 @@ async function addRecipesToList(req, res) {
 
       return {
         ...ingredient,
-        quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity
+        quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity,
       };
     });
 
@@ -544,7 +577,7 @@ async function addRecipesToList(req, res) {
     const mergedItems = {};
 
     // Add existing items to merged
-    existingItems.forEach(item => {
+    existingItems.forEach((item) => {
       const key = `${item.ingredient_name}|${item.unit || 'none'}`;
       mergedItems[key] = {
         id: item.id,
@@ -552,12 +585,12 @@ async function addRecipesToList(req, res) {
         quantity: item.quantity,
         unit: item.unit,
         category: item.category,
-        existing: true
+        existing: true,
       };
     });
 
     // Add or merge new ingredients
-    newIngredients.forEach(ing => {
+    newIngredients.forEach((ing) => {
       const key = `${ing.ingredient_name}|${ing.unit || 'none'}`;
 
       if (mergedItems[key]) {
@@ -574,7 +607,7 @@ async function addRecipesToList(req, res) {
           quantity: ing.quantity,
           unit: ing.unit,
           category: ing.category || categorizeIngredient(ing.ingredient_name),
-          existing: false
+          existing: false,
         };
       }
     });
@@ -605,7 +638,7 @@ async function addRecipesToList(req, res) {
     await Promise.all(updatePromises);
 
     // Track which recipes were added to this shopping list
-    const recipeAssociationPromises = recipeData.map(recipe => {
+    const recipeAssociationPromises = recipeData.map((recipe) => {
       return pool.query(
         `INSERT INTO shopping_list_recipes
          (shopping_list_id, recipe_id, scaled_servings)
@@ -628,15 +661,14 @@ async function addRecipesToList(req, res) {
     logger.info('Recipes added to shopping list', {
       userId,
       listId,
-      recipeCount: recipeIds.length
+      recipeCount: recipeIds.length,
     });
 
     res.status(200).json({
       shoppingList: listResult.rows[0],
       items: updatedItemsResult.rows,
-      message: 'Recipes added to shopping list successfully'
+      message: 'Recipes added to shopping list successfully',
     });
-
   } catch (error) {
     logger.error('Error adding recipes to shopping list', { error: error.message });
     res.status(500).json({ error: 'Failed to add recipes to shopping list' });
@@ -649,5 +681,5 @@ module.exports = {
   getShoppingList,
   updateItem,
   deleteShoppingList,
-  addRecipesToList
+  addRecipesToList,
 };
