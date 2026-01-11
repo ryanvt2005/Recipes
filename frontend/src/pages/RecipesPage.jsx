@@ -15,6 +15,8 @@ export default function RecipesPage() {
   const [pagination, setPagination] = useState(null);
   const [selectedRecipes, setSelectedRecipes] = useState([]);
   const [showShoppingListModal, setShowShoppingListModal] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [creatingList, setCreatingList] = useState(false);
 
   const navigate = useNavigate();
 
