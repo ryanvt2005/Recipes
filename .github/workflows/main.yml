@@ -204,7 +204,7 @@ jobs:
   # ====================
   deploy-development:
     name: Deploy to Development (Lightsail)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: build
     if: |
       github.ref == 'refs/heads/develop' &&
@@ -220,28 +220,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup SSH
+      - name: Deploy Application
         env:
-          LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
-          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$LIGHTSAIL_SSH_KEY" > ~/.ssh/lightsail_key
-          chmod 600 ~/.ssh/lightsail_key
-          ssh-keyscan -H $LIGHTSAIL_IP >> ~/.ssh/known_hosts || echo "Warning: Could not scan host keys"
-          # Disable strict host key checking as fallback
-          echo "Host $LIGHTSAIL_IP" >> ~/.ssh/config
-          echo "  StrictHostKeyChecking accept-new" >> ~/.ssh/config
-          echo "  UserKnownHostsFile ~/.ssh/known_hosts" >> ~/.ssh/config
-
-      - name: Deploy to Lightsail
-        env:
-          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
-          ssh -i ~/.ssh/lightsail_key ec2-user@$LIGHTSAIL_IP bash << ENDSSH
           set -e
 
           echo "========================================"
@@ -261,17 +245,19 @@ jobs:
 
           # Create/update environment file
           echo "🔧 Updating environment configuration..."
-          echo "DB_HOST=db" > .env
-          echo "DB_PORT=5432" >> .env
-          echo "DB_NAME=recipeapp" >> .env
-          echo "DB_USER=recipeuser" >> .env
-          echo "DB_PASSWORD=$DB_PASSWORD" >> .env
-          echo "JWT_SECRET=$JWT_SECRET" >> .env
-          echo "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY" >> .env
-          echo "NODE_ENV=production" >> .env
-          echo "PORT=3000" >> .env
-          echo "FRONTEND_URL=http://$LIGHTSAIL_IP:3001" >> .env
-          echo "VITE_API_URL=http://$LIGHTSAIL_IP:3000" >> .env
+          cat > .env << EOF
+          DB_HOST=db
+          DB_PORT=5432
+          DB_NAME=recipeapp
+          DB_USER=recipeuser
+          DB_PASSWORD=${DB_PASSWORD}
+          JWT_SECRET=${JWT_SECRET}
+          ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+          NODE_ENV=production
+          PORT=3000
+          FRONTEND_URL=http://localhost:3001
+          VITE_API_URL=http://localhost:3000
+          EOF
 
           # Stop existing containers
           echo "🛑 Stopping existing containers..."
@@ -305,13 +291,8 @@ jobs:
 
           echo ""
           echo "✅ Deployment complete!"
-          echo "🌐 API: http://$LIGHTSAIL_IP:3000"
-          echo "🌐 Frontend: http://$LIGHTSAIL_IP:3001"
-          ENDSSH
 
       - name: Health Check
-        env:
-          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
         run: |
           echo "🏥 Running health checks..."
           sleep 10
@@ -319,7 +300,7 @@ jobs:
           # Check backend health
           echo "Checking backend health..."
           for i in {1..12}; do
-            if curl -f -s http://$LIGHTSAIL_IP:3000/health > /dev/null; then
+            if curl -f -s http://localhost:3000/health > /dev/null; then
               echo "✅ Backend is healthy!"
               break
             fi
@@ -333,7 +314,7 @@ jobs:
 
           # Check frontend
           echo "Checking frontend..."
-          if curl -f -s http://$LIGHTSAIL_IP:3001 > /dev/null; then
+          if curl -f -s http://localhost:3001 > /dev/null; then
             echo "✅ Frontend is accessible!"
           else
             echo "⚠️  Frontend may still be starting up"
@@ -343,8 +324,6 @@ jobs:
           echo "========================================"
           echo "✅ Deployment Successful!"
           echo "========================================"
-          echo "🌐 API: http://$LIGHTSAIL_IP:3000/health"
-          echo "🌐 Frontend: http://$LIGHTSAIL_IP:3001"
 
       - name: Notify on failure
         if: failure()

@@ -9,8 +9,19 @@ The application uses a single, unified GitHub Actions workflow ([.github/workflo
 - **Code Quality Checks** - Linting and formatting validation
 - **Automated Testing** - Backend test suite with PostgreSQL
 - **Docker Image Building** - Build and push to GitHub Container Registry
-- **Automated Deployment** - Deploy to development environment on Lightsail
+- **Automated Deployment** - Deploy to development environment on Lightsail using self-hosted runner
 - **Health Checks** - Verify deployment success
+
+## Self-Hosted Runner Deployment
+
+The deployment uses a **self-hosted GitHub Actions runner** installed on the Lightsail instance. This provides:
+
+- ✅ **Faster deployments** - No network transfer, runs locally
+- ✅ **No firewall configuration** - Runner has direct access to deployment
+- ✅ **More secure** - No external SSH access required
+- ✅ **Simplified workflow** - Direct Docker and file system access
+
+**Setup Instructions:** See [Self-Hosted Runner Setup Guide](SELF_HOSTED_RUNNER_SETUP.md)
 
 ## Workflow Structure
 

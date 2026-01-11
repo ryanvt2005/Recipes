@@ -380,6 +380,7 @@ Recipes/
 ## Documentation
 
 - **[CI/CD Pipeline](docs/CICD.md)** - Detailed CI/CD workflow documentation
+- **[Self-Hosted Runner Setup](docs/SELF_HOSTED_RUNNER_SETUP.md)** - Setup GitHub Actions runner on Lightsail
 - **[DevOps Quick Reference](docs/DEVOPS_QUICK_REFERENCE.md)** - Common commands and procedures
 
 ## Contributing
