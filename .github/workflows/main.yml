@@ -269,7 +269,7 @@ jobs:
 
           # Build new images
           echo "🏗️  Building Docker images..."
-          docker compose build --no-cache --parallel
+          docker compose build --no-cache
 
           # Start services
           echo "🚀 Starting services..."
