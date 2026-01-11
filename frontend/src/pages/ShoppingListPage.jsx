@@ -4,6 +4,7 @@ import { shoppingLists } from '../services/api';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
+import { PrinterIcon } from '@heroicons/react/24/outline';
 
 export default function ShoppingListPage() {
   const { id } = useParams();
@@ -67,6 +68,10 @@ export default function ShoppingListPage() {
     } catch (err) {
       setError('Failed to delete shopping list');
     }
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   const formatQuantity = (quantity, unit) => {
@@ -149,10 +154,18 @@ export default function ShoppingListPage() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <Link to="/recipes">
+                <Button
+                  onClick={handlePrint}
+                  variant="outline"
+                  className="flex items-center gap-2 no-print"
+                >
+                  <PrinterIcon className="w-5 h-5" />
+                  Print
+                </Button>
+                <Link to="/recipes" className="no-print">
                   <Button variant="secondary">Back to Recipes</Button>
                 </Link>
-                <Button variant="danger" onClick={handleDelete}>
+                <Button variant="danger" onClick={handleDelete} className="no-print">
                   Delete List
                 </Button>
               </div>
@@ -165,7 +178,7 @@ export default function ShoppingListPage() {
             )}
 
             {/* Progress Bar */}
-            <div className="card">
+            <div className="card no-print">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-gray-700">Progress</span>
                 <span className="text-sm text-gray-600">
@@ -279,7 +292,7 @@ export default function ShoppingListPage() {
 
           {/* Sidebar - Recipes */}
           {recipes.length > 0 && (
-            <div className="w-80 flex-shrink-0">
+            <div className="w-80 flex-shrink-0 no-print">
               <div className="sticky top-6">
                 <div className="card">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Recipes in this list</h3>
