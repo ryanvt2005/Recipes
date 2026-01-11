@@ -148,8 +148,8 @@ export default function ShoppingListPage() {
             {/* Header */}
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">{shoppingList?.name}</h1>
-                <p className="text-gray-600 mt-1">
+                <h1 className="text-3xl font-bold text-gray-900 shopping-list-title">{shoppingList?.name}</h1>
+                <p className="text-gray-600 mt-1 no-print">
                   {checkedCount} of {totalCount} items checked
                 </p>
               </div>
@@ -215,8 +215,8 @@ export default function ShoppingListPage() {
                     <div key={category} className="card">
                       {/* Category Header */}
                       <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900">{category}</h3>
-                        <span className="text-sm text-gray-600">
+                        <h3 className="text-lg font-semibold text-gray-900 shopping-category">{category}</h3>
+                        <span className="text-sm text-gray-600 no-print">
                           {categoryChecked}/{categoryTotal} items
                         </span>
                       </div>
@@ -241,14 +241,14 @@ export default function ShoppingListPage() {
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2">
                                 <div
-                                  className={`font-medium flex-1 ${item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'}`}
+                                  className={`font-medium flex-1 shopping-item ${item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'}`}
                                 >
                                   {item.ingredient_name}
                                 </div>
                                 <select
                                   value={item.category || 'Other'}
                                   onChange={(e) => updateItemCategory(item.id, e.target.value)}
-                                  className="text-xs px-2 py-1 border border-gray-300 rounded bg-white hover:border-primary-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
+                                  className="text-xs px-2 py-1 border border-gray-300 rounded bg-white hover:border-primary-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 no-print"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   {CATEGORY_ORDER.map((cat) => (
@@ -279,7 +279,7 @@ export default function ShoppingListPage() {
             </div>
 
             {/* Tips */}
-            <div className="card bg-blue-50 border-blue-200">
+            <div className="card bg-blue-50 border-blue-200 no-print">
               <h3 className="font-semibold text-blue-900 mb-2">💡 Tips</h3>
               <ul className="text-sm text-blue-800 space-y-1">
                 <li>• Items are organized by grocery store category for easier shopping</li>
