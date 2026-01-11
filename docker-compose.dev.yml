@@ -1,0 +1,14 @@
+# Docker Compose for Local Development
+# This extends docker-compose.yml with development-specific settings
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    volumes:
+      - ./backend:/app  # Mount source code for live reload
+      - /app/node_modules  # Prevent overwriting node_modules
+    environment:
+      NODE_ENV: development  # Override to development mode

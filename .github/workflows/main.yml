@@ -1,0 +1,421 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop, feature/**]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: false
+        type: choice
+        options:
+          - none
+          - development
+          - production
+        default: 'none'
+
+env:
+  NODE_VERSION: '20'
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+
+jobs:
+  # ====================
+  # CODE QUALITY CHECKS
+  # ====================
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --prefer-offline
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --prefer-offline
+
+      - name: Lint backend
+        working-directory: backend
+        run: npm run lint
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Check backend formatting
+        working-directory: backend
+        run: npm run format:check
+
+      - name: Check frontend formatting
+        working-directory: frontend
+        run: npm run format:check
+
+  # ====================
+  # AUTOMATED TESTS
+  # ====================
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: recipeapp_test
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --prefer-offline
+
+      - name: Run backend tests
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: recipeapp_test
+          DB_USER: testuser
+          DB_PASSWORD: testpass
+          JWT_SECRET: test-secret-key-for-ci
+          NODE_ENV: test
+        run: npm test -- --passWithNoTests
+
+      - name: Upload test coverage
+        uses: codecov/codecov-action@v4
+        if: always()
+        with:
+          directory: backend/coverage
+          flags: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+  # ====================
+  # BUILD DOCKER IMAGES
+  # ====================
+  build:
+    name: Build & Push Images
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for backend
+        id: backend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.backend-meta.outputs.tags }}
+          labels: ${{ steps.backend-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          target: prod
+
+      - name: Extract metadata for frontend
+        id: frontend-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: true
+          tags: ${{ steps.frontend-meta.outputs.tags }}
+          labels: ${{ steps.frontend-meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          target: production
+          build-args: |
+            VITE_API_URL=${{ github.ref == 'refs/heads/main' && secrets.PROD_API_URL || secrets.DEV_API_URL }}
+
+  # ====================
+  # DEPLOY TO DEVELOPMENT
+  # ====================
+  deploy-development:
+    name: Deploy to Development (Lightsail)
+    runs-on: self-hosted
+    needs: build
+    if: |
+      github.ref == 'refs/heads/develop' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'development'))
+    environment:
+      name: development
+    concurrency:
+      group: deploy-development
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy Application
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          set -e
+
+          echo "========================================"
+          echo "🚀 Starting Deployment"
+          echo "========================================"
+
+          # Navigate to app directory
+          cd ~/Recipes || { echo "❌ Failed to find ~/Recipes"; exit 1; }
+
+          # Pull latest code
+          echo "📥 Fetching latest code from develop branch..."
+          git fetch origin
+          git checkout develop
+          git reset --hard origin/develop
+
+          echo "📊 Deploying commit: $(git log -1 --oneline)"
+
+          # Create/update environment file
+          echo "🔧 Updating environment configuration..."
+          cat > .env << EOF
+          DB_HOST=db
+          DB_PORT=5432
+          DB_NAME=recipeapp
+          DB_USER=recipeuser
+          DB_PASSWORD=${DB_PASSWORD}
+          JWT_SECRET=${JWT_SECRET}
+          ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+          NODE_ENV=production
+          PORT=3000
+          FRONTEND_URL=http://44.204.123.21:3001
+          VITE_API_URL=http://44.204.123.21:3000
+          EOF
+
+          # Stop existing containers
+          echo "🛑 Stopping existing containers..."
+          docker stop recipe-app-backend recipe-app-frontend recipe-app-db 2>/dev/null || true
+          docker rm recipe-app-backend recipe-app-frontend recipe-app-db 2>/dev/null || true
+
+          # Clean up old images to save space
+          echo "🧹 Cleaning up old Docker images..."
+          docker image prune -af --filter "until=24h" || true
+
+          # Build new images using direct docker build (no buildx required)
+          echo "🏗️  Building backend image..."
+          docker build -t recipe-app-backend:latest --target prod ./backend
+
+          echo "🏗️  Building frontend image..."
+          docker build -t recipe-app-frontend:latest --target production \
+            --build-arg VITE_API_URL=http://44.204.123.21:3000 ./frontend
+
+          # Create network if it doesn't exist
+          echo "🔗 Creating Docker network..."
+          docker network create recipes_default 2>/dev/null || true
+
+          # Create volume if it doesn't exist
+          echo "💾 Creating PostgreSQL volume..."
+          docker volume create recipes_postgres_data 2>/dev/null || true
+
+          # Start database
+          echo "🚀 Starting PostgreSQL database..."
+          docker run -d \
+            --name recipe-app-db \
+            --network recipes_default \
+            -e POSTGRES_DB=recipeapp \
+            -e POSTGRES_USER=recipeuser \
+            -e POSTGRES_PASSWORD=${DB_PASSWORD} \
+            -v recipes_postgres_data:/var/lib/postgresql/data \
+            -p 5432:5432 \
+            --restart unless-stopped \
+            postgres:15-alpine
+
+          # Wait for database to be ready
+          echo "⏳ Waiting for database to be ready..."
+          sleep 10
+
+          # Start backend
+          echo "🚀 Starting backend service..."
+          docker run -d \
+            --name recipe-app-backend \
+            --network recipes_default \
+            -e DB_HOST=recipe-app-db \
+            -e DB_PORT=5432 \
+            -e DB_NAME=recipeapp \
+            -e DB_USER=recipeuser \
+            -e DB_PASSWORD=${DB_PASSWORD} \
+            -e JWT_SECRET=${JWT_SECRET} \
+            -e ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY} \
+            -e NODE_ENV=production \
+            -e PORT=3000 \
+            -e FRONTEND_URL=http://44.204.123.21:3001 \
+            -p 3000:3000 \
+            --restart unless-stopped \
+            recipe-app-backend:latest
+
+          # Wait for backend to start
+          echo "⏳ Waiting for backend to start..."
+          sleep 10
+
+          # Start frontend
+          echo "🚀 Starting frontend service..."
+          docker run -d \
+            --name recipe-app-frontend \
+            --network recipes_default \
+            -p 3001:80 \
+            --restart unless-stopped \
+            recipe-app-frontend:latest
+
+          # Run database migrations
+          echo "🗄️  Running database migrations..."
+          docker exec recipe-app-backend npm run migrate || echo "⚠️  Migrations may have already been applied"
+
+          # Show container status
+          echo "========================================"
+          echo "📋 Container Status:"
+          echo "========================================"
+          docker ps --filter "name=recipe-app"
+
+          echo ""
+          echo "✅ Deployment complete!"
+
+      - name: Health Check
+        run: |
+          echo "🏥 Running health checks..."
+          sleep 10
+
+          # Check backend health
+          echo "Checking backend health..."
+          for i in {1..12}; do
+            if curl -f -s http://localhost:3000/health > /dev/null; then
+              echo "✅ Backend is healthy!"
+              break
+            fi
+            if [ $i -eq 12 ]; then
+              echo "❌ Backend health check failed after 60 seconds"
+              exit 1
+            fi
+            echo "Attempt $i/12 - waiting 5 seconds..."
+            sleep 5
+          done
+
+          # Check frontend
+          echo "Checking frontend..."
+          if curl -f -s http://localhost:3001 > /dev/null; then
+            echo "✅ Frontend is accessible!"
+          else
+            echo "⚠️  Frontend may still be starting up"
+          fi
+
+          echo ""
+          echo "========================================"
+          echo "✅ Deployment Successful!"
+          echo "========================================"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Deployment failed. Check the logs above for details."
+          echo "💡 Common issues:"
+          echo "   - Database connection problems"
+          echo "   - Migration failures"
+          echo "   - Docker build errors"
+          echo "   - Insufficient disk space"
+
+  # ====================
+  # DEPLOY TO PRODUCTION
+  # ====================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: |
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'))
+    environment:
+      name: production
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Production deployment placeholder
+        run: |
+          echo "🚧 Production deployment not yet configured"
+          echo "📝 Add your production deployment steps here:"
+          echo "   - AWS ECS/Fargate"
+          echo "   - AWS Elastic Beanstalk"
+          echo "   - Kubernetes"
+          echo "   - Or another production-grade platform"
+          exit 0

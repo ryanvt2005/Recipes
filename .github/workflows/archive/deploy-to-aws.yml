@@ -1,0 +1,151 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - claude/recipe-app-backend-UoTAm
+      - main
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: recipe-app-backend
+
+jobs:
+  # Job 1: Build and Push Docker Image to ECR
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.image-tag.outputs.tag }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Create ECR repository if it doesn't exist
+        run: |
+          aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} || \
+          aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }}
+
+      - name: Generate image tag
+        id: image-tag
+        run: |
+          IMAGE_TAG=${GITHUB_SHA::8}-$(date +%s)
+          echo "tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ steps.image-tag.outputs.tag }}
+        run: |
+          cd backend
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "Image pushed: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+
+  # Job 2: Deploy to Lightsail (Simple option)
+  deploy-lightsail:
+    name: Deploy to Lightsail
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/claude/recipe-app-backend-UoTAm'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Deploy to Lightsail via SSH
+        env:
+          LIGHTSAIL_INSTANCE: ${{ secrets.LIGHTSAIL_INSTANCE_NAME }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          # Get instance IP
+          INSTANCE_IP=$(aws lightsail get-instance \
+            --instance-name "$LIGHTSAIL_INSTANCE" \
+            --region ${{ env.AWS_REGION }} \
+            --query 'instance.publicIpAddress' \
+            --output text)
+
+          echo "Deploying to instance: $INSTANCE_IP"
+
+          # Note: For SSH deployment, you'll need to set up SSH keys
+          # This is a placeholder for the deployment logic
+          echo "Instance IP: $INSTANCE_IP"
+          echo "To complete SSH deployment, add SSH keys to GitHub Secrets"
+
+  # Job 3: Deploy to ECS Fargate (Production option)
+  deploy-ecs:
+    name: Deploy to ECS Fargate
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'  # Only deploy to ECS from main branch
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: .aws/ecs-task-definition.json
+          container-name: recipe-app-backend
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.build.outputs.image-tag }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: recipe-app-service
+          cluster: recipe-app-cluster
+          wait-for-service-stability: true
+
+  # Job 4: Notify on completion
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [build, deploy-lightsail]
+    if: always()
+
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "🚀 Deployment Status"
+          echo "Build: ${{ needs.build.result }}"
+          echo "Deploy: ${{ needs.deploy-lightsail.result }}"
+          echo "Image Tag: ${{ needs.build.outputs.image-tag }}"

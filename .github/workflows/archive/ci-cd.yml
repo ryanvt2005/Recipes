@@ -1,0 +1,253 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+  AWS_REGION: us-east-1
+
+jobs:
+  # Job 1: Code Quality Checks
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Lint backend
+        working-directory: backend
+        run: npm run lint
+
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
+
+  # Job 2: Test
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    needs: quality
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: recipeapp_test
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: recipeapp_test
+          DB_USER: testuser
+          DB_PASSWORD: testpass
+          JWT_SECRET: test-secret-key
+          NODE_ENV: test
+        run: npm test -- --passWithNoTests
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          directory: backend/coverage
+          flags: backend
+
+  # Job 3: Build Docker Images
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [quality, test]
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: recipe-app-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          push: false
+          tags: recipe-app-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Job 4: Deploy to Development (Lightsail)
+  deploy-dev:
+    name: Deploy to Development
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment:
+      name: development
+      url: http://${{ secrets.LIGHTSAIL_IP }}:3000
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$LIGHTSAIL_SSH_KEY" > ~/.ssh/lightsail_key
+          chmod 600 ~/.ssh/lightsail_key
+          ssh-keyscan -H $LIGHTSAIL_IP >> ~/.ssh/known_hosts
+
+      - name: Deploy to Lightsail
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          ssh -i ~/.ssh/lightsail_key ec2-user@$LIGHTSAIL_IP bash << 'ENDSSH'
+          set -e
+
+          cd ~/Recipes
+
+          echo "📡 Fetching latest code from develop branch..."
+          git fetch origin
+          git checkout develop
+          git reset --hard origin/develop
+
+          echo "📊 Deploying commit: $(git log -1 --oneline)"
+
+          echo "🔧 Creating environment file..."
+          cat > .env << EOF
+          DB_HOST=db
+          DB_PORT=5432
+          DB_NAME=recipeapp
+          DB_USER=recipeuser
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          NODE_ENV=production
+          PORT=3000
+          FRONTEND_URL=http://${{ secrets.LIGHTSAIL_IP }}:3001
+          VITE_API_URL=http://${{ secrets.LIGHTSAIL_IP }}:3000
+          EOF
+
+          echo "🛑 Stopping existing containers..."
+          docker-compose down
+
+          echo "🏗️  Building containers from source..."
+          docker-compose build --no-cache
+
+          echo "🚀 Starting all services..."
+          docker-compose up -d
+
+          echo "⏳ Waiting for services to start..."
+          sleep 20
+
+          echo "🗄️  Running database migrations..."
+          docker-compose exec -T backend npm run migrate || echo "Migrations already applied"
+
+          echo "✅ Deployment complete!"
+          docker-compose ps
+          ENDSSH
+
+      - name: Health check
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+        run: |
+          sleep 5
+          for i in {1..5}; do
+            if curl -f -s http://$LIGHTSAIL_IP:3000/health; then
+              echo "Health check passed"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Health check failed"
+          exit 1
+
+  # Job 5: Deploy to Production (when ready)
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Placeholder for production deployment
+        run: |
+          echo "Production deployment not configured yet"
+          echo "Add ECS, Elastic Beanstalk, or other production deployment here"

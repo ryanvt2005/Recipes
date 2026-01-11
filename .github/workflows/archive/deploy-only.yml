@@ -1,0 +1,84 @@
+name: Deploy to Lightsail (Manual)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Lightsail
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        env:
+          LIGHTSAIL_SSH_KEY: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$LIGHTSAIL_SSH_KEY" > ~/.ssh/lightsail_key
+          chmod 600 ~/.ssh/lightsail_key
+          ssh-keyscan -H $LIGHTSAIL_IP >> ~/.ssh/known_hosts
+
+      - name: Deploy to Lightsail
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+        run: |
+          ssh -i ~/.ssh/lightsail_key ec2-user@$LIGHTSAIL_IP bash << 'ENDSSH'
+          set -e
+
+          echo "📦 Pulling latest code..."
+          cd ~/Recipes
+          git fetch origin
+          git checkout develop
+          git pull origin develop
+
+          echo "🔧 Setting up environment..."
+          cat > .env << EOF
+          DB_HOST=db
+          DB_PORT=5432
+          DB_NAME=recipeapp
+          DB_USER=recipeuser
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}
+          NODE_ENV=production
+          PORT=3000
+          FRONTEND_URL=http://localhost:3001
+          EOF
+
+          echo "🐳 Building and restarting containers..."
+          docker-compose down
+          docker-compose up -d --build
+
+          echo "⏳ Waiting for containers to start..."
+          sleep 15
+
+          echo "🗄️  Running database migrations..."
+          docker-compose exec -T backend npm run migrate || true
+
+          echo "✅ Deployment complete!"
+          docker-compose ps
+          ENDSSH
+
+      - name: Health check
+        env:
+          LIGHTSAIL_IP: ${{ secrets.LIGHTSAIL_IP }}
+        run: |
+          echo "🏥 Running health check..."
+          sleep 5
+          for i in {1..5}; do
+            if curl -f -s http://$LIGHTSAIL_IP:3000/health; then
+              echo "✅ Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i failed, retrying..."
+            sleep 5
+          done
+          echo "❌ Health check failed"
+          exit 1
