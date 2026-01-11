@@ -261,20 +261,19 @@ jobs:
 
           # Stop existing containers
           echo "🛑 Stopping existing containers..."
-          docker compose down || true
+          docker-compose down || true
 
           # Clean up old images to save space
           echo "🧹 Cleaning up old Docker images..."
           docker image prune -af --filter "until=24h" || true
 
-          # Build new images (pull fresh to avoid cache issues)
+          # Build new images using legacy docker-compose (compatible with older systems)
           echo "🏗️  Building Docker images..."
-          docker compose pull || true
-          docker compose build
+          docker-compose build
 
           # Start services
           echo "🚀 Starting services..."
-          docker compose up -d
+          docker-compose up -d
 
           # Wait for services to be healthy
           echo "⏳ Waiting for services to start..."
@@ -282,13 +281,13 @@ jobs:
 
           # Run database migrations
           echo "🗄️  Running database migrations..."
-          docker compose exec -T backend npm run migrate || echo "⚠️  Migrations may have already been applied"
+          docker-compose exec -T backend npm run migrate || echo "⚠️  Migrations may have already been applied"
 
           # Show container status
           echo "========================================"
           echo "📋 Container Status:"
           echo "========================================"
-          docker compose ps
+          docker-compose ps
 
           echo ""
           echo "✅ Deployment complete!"
