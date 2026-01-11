@@ -6,22 +6,9 @@ on:
   pull_request:
     branches: [main, develop]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to deploy to'
-        required: false
-        type: choice
-        options:
-          - none
-          - development
-          - production
-        default: 'none'
 
 env:
   NODE_VERSION: '20'
-  REGISTRY: ghcr.io
-  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
-  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
 
 jobs:
   # ====================
@@ -128,92 +115,19 @@ jobs:
         continue-on-error: true
 
   # ====================
-  # BUILD DOCKER IMAGES
+  # DEPLOY TO LIGHTSAIL
   # ====================
-  build:
-    name: Build & Push Images
-    runs-on: ubuntu-latest
-    needs: [lint, test]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata for backend
-        id: backend-meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push backend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          file: ./backend/Dockerfile
-          push: true
-          tags: ${{ steps.backend-meta.outputs.tags }}
-          labels: ${{ steps.backend-meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          target: prod
-
-      - name: Extract metadata for frontend
-        id: frontend-meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          file: ./frontend/Dockerfile
-          push: true
-          tags: ${{ steps.frontend-meta.outputs.tags }}
-          labels: ${{ steps.frontend-meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          target: production
-          build-args: |
-            VITE_API_URL=${{ github.ref == 'refs/heads/main' && secrets.PROD_API_URL || secrets.DEV_API_URL }}
-
-  # ====================
-  # DEPLOY TO DEVELOPMENT
-  # ====================
-  deploy-development:
-    name: Deploy to Development (Lightsail)
+  # Only runs when pushing to main branch
+  # Builds happen locally on the runner, then containers are restarted
+  deploy-lightsail:
+    name: Deploy to Lightsail
     runs-on: self-hosted
-    needs: build
-    if: |
-      github.ref == 'refs/heads/develop' &&
-      (github.event_name == 'push' ||
-       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'development'))
+    needs: [lint, test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment:
-      name: development
+      name: production
     concurrency:
-      group: deploy-development
+      group: deploy-lightsail
       cancel-in-progress: false
 
     steps:
@@ -229,17 +143,17 @@ jobs:
           set -e
 
           echo "========================================"
-          echo "🚀 Starting Deployment"
+          echo "🚀 Starting Deployment to Lightsail"
           echo "========================================"
 
           # Navigate to app directory
           cd ~/Recipes || { echo "❌ Failed to find ~/Recipes"; exit 1; }
 
-          # Pull latest code
-          echo "📥 Fetching latest code from develop branch..."
+          # Pull latest code from main
+          echo "📥 Fetching latest code from main branch..."
           git fetch origin
-          git checkout develop
-          git reset --hard origin/develop
+          git checkout main
+          git reset --hard origin/main
 
           echo "📊 Deploying commit: $(git log -1 --oneline)"
 
@@ -268,8 +182,7 @@ jobs:
           echo "🧹 Cleaning up old Docker images..."
           docker image prune -af --filter "until=24h" || true
 
-          # Build new images using direct docker build (no buildx required)
-          # Build frontend first (most memory intensive)
+          # Build new images locally
           echo "🏗️  Building frontend image..."
           NODE_OPTIONS="--max-old-space-size=768" docker build -t recipe-app-frontend:latest \
             --target production \
@@ -384,6 +297,8 @@ jobs:
           echo "========================================"
           echo "✅ Deployment Successful!"
           echo "========================================"
+          echo "🌐 Application: http://44.204.123.21:3001"
+          echo "🔧 API: http://44.204.123.21:3000"
 
       - name: Notify on failure
         if: failure()
@@ -394,34 +309,3 @@ jobs:
           echo "   - Migration failures"
           echo "   - Docker build errors"
           echo "   - Insufficient disk space"
-
-  # ====================
-  # DEPLOY TO PRODUCTION
-  # ====================
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: build
-    if: |
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'push' ||
-       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'))
-    environment:
-      name: production
-    concurrency:
-      group: deploy-production
-      cancel-in-progress: false
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Production deployment placeholder
-        run: |
-          echo "🚧 Production deployment not yet configured"
-          echo "📝 Add your production deployment steps here:"
-          echo "   - AWS ECS/Fargate"
-          echo "   - AWS Elastic Beanstalk"
-          echo "   - Kubernetes"
-          echo "   - Or another production-grade platform"
-          exit 0
