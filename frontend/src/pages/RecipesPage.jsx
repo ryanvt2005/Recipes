@@ -15,7 +15,6 @@ export default function RecipesPage() {
   const [pagination, setPagination] = useState(null);
   const [selectedRecipes, setSelectedRecipes] = useState([]);
   const [showShoppingListModal, setShowShoppingListModal] = useState(false);
-  const [creatingList, setCreatingList] = useState(false);
 
   const navigate = useNavigate();
 

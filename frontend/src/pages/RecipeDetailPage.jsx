@@ -219,7 +219,7 @@ export default function RecipeDetailPage() {
         navigate(`/shopping-lists/${response.data.shoppingList.id}`);
       } else {
         // Add to existing shopping list
-        const response = await shoppingLists.addRecipesToList(selection.listId, [recipeData]);
+        await shoppingLists.addRecipesToList(selection.listId, [recipeData]);
         navigate(`/shopping-lists/${selection.listId}`);
       }
     } catch (err) {
