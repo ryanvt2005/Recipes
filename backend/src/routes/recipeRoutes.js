@@ -8,6 +8,11 @@ const {
   updateRecipe,
   deleteRecipe,
 } = require('../controllers/recipeController');
+const {
+  getNoteForRecipe,
+  upsertNoteForRecipe,
+  deleteNoteForRecipe,
+} = require('../controllers/recipeNotesController');
 const { authenticateToken } = require('../middlewares/auth');
 const {
   validate,
@@ -55,5 +60,14 @@ router.put('/:id', authenticateToken, validate(updateRecipeSchema), updateRecipe
 
 // DELETE /api/v1/recipes/:id - Delete a recipe
 router.delete('/:id', authenticateToken, deleteRecipe);
+
+// GET /api/v1/recipes/:recipeId/note - Get user's note for a recipe
+router.get('/:recipeId/note', authenticateToken, getNoteForRecipe);
+
+// PUT /api/v1/recipes/:recipeId/note - Create or update user's note for a recipe
+router.put('/:recipeId/note', authenticateToken, upsertNoteForRecipe);
+
+// DELETE /api/v1/recipes/:recipeId/note - Delete user's note for a recipe
+router.delete('/:recipeId/note', authenticateToken, deleteNoteForRecipe);
 
 module.exports = router;
