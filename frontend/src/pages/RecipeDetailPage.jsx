@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
 import ShoppingListSelectorModal from '../components/ShoppingListSelectorModal';
+import RecipeNotes from '../components/RecipeNotes';
 import { MinusIcon, PlusIcon, ShoppingCartIcon } from '@heroicons/react/24/outline';
 
 export default function RecipeDetailPage() {
@@ -494,6 +495,11 @@ export default function RecipeDetailPage() {
               ))}
             </ol>
           </div>
+        </div>
+
+        {/* Recipe Notes */}
+        <div className="mt-8">
+          <RecipeNotes recipeId={id} />
         </div>
 
         {/* Source Link */}

@@ -46,6 +46,9 @@ export const recipes = {
   getScaled: (id, servings) => api.get(`/recipes/${id}/scaled`, { params: { servings } }),
   update: (id, data) => api.put(`/recipes/${id}`, data),
   delete: (id) => api.delete(`/recipes/${id}`),
+  getNote: (recipeId) => api.get(`/recipes/${recipeId}/note`),
+  upsertNote: (recipeId, noteText) => api.put(`/recipes/${recipeId}/note`, { noteText }),
+  deleteNote: (recipeId) => api.delete(`/recipes/${recipeId}/note`),
 };
 
 // Shopping list endpoints
