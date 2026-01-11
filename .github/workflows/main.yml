@@ -255,8 +255,8 @@ jobs:
           ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
           NODE_ENV=production
           PORT=3000
-          FRONTEND_URL=http://localhost:3001
-          VITE_API_URL=http://localhost:3000
+          FRONTEND_URL=http://44.204.123.21:3001
+          VITE_API_URL=http://44.204.123.21:3000
           EOF
 
           # Stop existing containers
@@ -274,7 +274,7 @@ jobs:
 
           echo "🏗️  Building frontend image..."
           docker build -t recipe-app-frontend:latest --target production \
-            --build-arg VITE_API_URL=http://localhost:3000 ./frontend
+            --build-arg VITE_API_URL=http://44.204.123.21:3000 ./frontend
 
           # Create network if it doesn't exist
           echo "🔗 Creating Docker network..."
@@ -315,7 +315,7 @@ jobs:
             -e ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY} \
             -e NODE_ENV=production \
             -e PORT=3000 \
-            -e FRONTEND_URL=http://localhost:3001 \
+            -e FRONTEND_URL=http://44.204.123.21:3001 \
             -p 3000:3000 \
             --restart unless-stopped \
             recipe-app-backend:latest
