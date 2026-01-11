@@ -12,9 +12,10 @@ RUN npm ci --prefer-offline --no-audit
 # Copy source code
 COPY . .
 
-# Build application
+# Build application with memory optimization for small instances
 ARG VITE_API_URL
 ENV VITE_API_URL=${VITE_API_URL}
+ENV NODE_OPTIONS="--max-old-space-size=768"
 RUN npm run build
 
 # Production stage
