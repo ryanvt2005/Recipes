@@ -111,18 +111,36 @@
   .shopping-category {
     font-weight: bold;
     margin-top: 12pt;
+    margin-bottom: 6pt;
     font-size: 13pt;
     text-transform: capitalize;
+    border-bottom: 1px solid #000;
+    padding-bottom: 4pt;
   }
 
   .shopping-item {
-    margin-left: 12pt;
-    margin-bottom: 6pt;
+    display: block !important;
+    margin-bottom: 8pt;
+    padding-left: 0 !important;
   }
 
   .shopping-item::before {
     content: "☐ ";
     margin-right: 8pt;
+    font-size: 14pt;
+  }
+
+  /* Hide interactive elements on shopping lists */
+  input[type="checkbox"],
+  .line-through {
+    display: none !important;
+  }
+
+  /* Simplify item containers */
+  .shopping-item {
+    background: none !important;
+    border: none !important;
+    padding: 4pt 0 !important;
   }
 
   /* Page margins */
