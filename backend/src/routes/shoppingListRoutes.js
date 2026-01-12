@@ -18,6 +18,9 @@ router.get('/:id', shoppingListController.getShoppingList);
 // Add recipes to an existing shopping list
 router.post('/:id/add-recipes', shoppingListController.addRecipesToList);
 
+// Remove a recipe from a shopping list
+router.delete('/:id/recipes/:recipeId', shoppingListController.removeRecipeFromList);
+
 // Update shopping list item (check/uncheck, add notes)
 router.patch('/items/:id', shoppingListController.updateItem);
 

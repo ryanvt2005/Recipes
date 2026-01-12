@@ -675,6 +675,55 @@ async function addRecipesToList(req, res) {
   }
 }
 
+/**
+ * Remove a recipe from a shopping list
+ * Deletes all items associated with that recipe
+ */
+async function removeRecipeFromList(req, res) {
+  const client = await pool.connect();
+
+  try {
+    const { id: shoppingListId, recipeId } = req.params;
+    const userId = req.user.userId;
+
+    await client.query('BEGIN');
+
+    // Verify shopping list belongs to user
+    const listCheck = await client.query(
+      'SELECT id FROM shopping_lists WHERE id = $1 AND user_id = $2',
+      [shoppingListId, userId]
+    );
+
+    if (listCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Shopping list not found' });
+    }
+
+    // Delete all items from this recipe
+    await client.query(
+      'DELETE FROM shopping_list_items WHERE shopping_list_id = $1 AND recipe_id = $2',
+      [shoppingListId, recipeId]
+    );
+
+    // Remove from shopping_list_recipes join table
+    await client.query(
+      'DELETE FROM shopping_list_recipes WHERE shopping_list_id = $1 AND recipe_id = $2',
+      [shoppingListId, recipeId]
+    );
+
+    await client.query('COMMIT');
+
+    logger.info(`Removed recipe ${recipeId} from shopping list ${shoppingListId}`);
+    res.json({ message: 'Recipe removed from shopping list' });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('Error removing recipe from shopping list:', error);
+    res.status(500).json({ error: 'Failed to remove recipe from shopping list' });
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   createFromRecipes,
   getUserShoppingLists,
@@ -682,4 +731,5 @@ module.exports = {
   updateItem,
   deleteShoppingList,
   addRecipesToList,
+  removeRecipeFromList,
 };

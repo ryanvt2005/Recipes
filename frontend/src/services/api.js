@@ -61,6 +61,8 @@ export const shoppingLists = {
   getOne: (id) => api.get(`/shopping-lists/${id}`),
   updateItem: (itemId, data) => api.patch(`/shopping-lists/items/${itemId}`, data),
   delete: (id) => api.delete(`/shopping-lists/${id}`),
+  removeRecipe: (shoppingListId, recipeId) =>
+    api.delete(`/shopping-lists/${shoppingListId}/recipes/${recipeId}`),
 };
 
 export default api;
