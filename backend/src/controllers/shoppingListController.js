@@ -179,8 +179,8 @@ function consolidateIngredients(recipeIngredients) {
   recipeIngredients.forEach((ing) => {
     const parsed = parseIngredient(ing.raw_text, ing.ingredient_name);
 
-    // Create a key based on ingredient name and unit
-    const key = `${parsed.name}|${parsed.unit || 'none'}`;
+    // Create a key based on ingredient name, unit, AND recipe_id to keep items from different recipes separate
+    const key = `${parsed.name}|${parsed.unit || 'none'}|${ing.recipe_id || 'unknown'}`;
 
     if (consolidated[key]) {
       // Add quantities if both exist
@@ -195,6 +195,7 @@ function consolidateIngredients(recipeIngredients) {
         quantity: parsed.quantity,
         unit: parsed.unit,
         category: categorizeIngredient(parsed.name),
+        recipe_id: ing.recipe_id, // Preserve recipe_id
       };
     }
   });
@@ -287,10 +288,10 @@ async function createFromRecipes(req, res) {
     const itemPromises = consolidatedIngredients.map((item, index) => {
       return pool.query(
         `INSERT INTO shopping_list_items
-         (shopping_list_id, ingredient_name, quantity, unit, category, sort_order)
-         VALUES ($1, $2, $3, $4, $5, $6)
+         (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [shoppingList.id, item.ingredient_name, item.quantity, item.unit, item.category, index]
+        [shoppingList.id, item.ingredient_name, item.quantity, item.unit, item.category, index, item.recipe_id]
       );
     });
 
@@ -607,6 +608,7 @@ async function addRecipesToList(req, res) {
           quantity: ing.quantity,
           unit: ing.unit,
           category: ing.category || categorizeIngredient(ing.ingredient_name),
+          recipe_id: ing.recipe_id, // Track which recipe this ingredient came from
           existing: false,
         };
       }
@@ -627,10 +629,10 @@ async function addRecipesToList(req, res) {
         // Insert new item
         return pool.query(
           `INSERT INTO shopping_list_items
-           (shopping_list_id, ingredient_name, quantity, unit, category)
-           VALUES ($1, $2, $3, $4, $5)
+           (shopping_list_id, ingredient_name, quantity, unit, category, recipe_id)
+           VALUES ($1, $2, $3, $4, $5, $6)
            RETURNING *`,
-          [listId, item.ingredient_name, item.quantity, item.unit, item.category]
+          [listId, item.ingredient_name, item.quantity, item.unit, item.category, item.recipe_id]
         );
       }
     });
