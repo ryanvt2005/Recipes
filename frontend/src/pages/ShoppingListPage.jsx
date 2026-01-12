@@ -4,7 +4,7 @@ import { shoppingLists } from '../services/api';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
-import { PrinterIcon } from '@heroicons/react/24/outline';
+import { PrinterIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
 export default function ShoppingListPage() {
   const { id } = useParams();
@@ -72,6 +72,20 @@ export default function ShoppingListPage() {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleRemoveRecipe = async (recipeId, recipeTitle) => {
+    if (!confirm(`Remove "${recipeTitle}" and all its ingredients from this shopping list?`)) {
+      return;
+    }
+
+    try {
+      await shoppingLists.removeRecipe(id, recipeId);
+      // Refresh the shopping list
+      await fetchShoppingList();
+    } catch (err) {
+      setError('Failed to remove recipe from shopping list');
+    }
   };
 
   const formatQuantity = (quantity, unit) => {
@@ -298,8 +312,11 @@ export default function ShoppingListPage() {
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Recipes in this list</h3>
                   <div className="space-y-3">
                     {recipes.map((recipe) => (
-                      <Link key={recipe.id} to={`/recipes/${recipe.id}`} className="block group">
-                        <div className="flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                      <div
+                        key={recipe.id}
+                        className="flex gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        <Link to={`/recipes/${recipe.id}`} className="flex gap-3 flex-1 min-w-0">
                           {recipe.image_url && (
                             <img
                               src={recipe.image_url}
@@ -308,7 +325,7 @@ export default function ShoppingListPage() {
                             />
                           )}
                           <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2">
+                            <h4 className="font-medium text-gray-900 hover:text-primary-600 transition-colors line-clamp-2">
                               {recipe.title}
                             </h4>
                             {recipe.scaled_servings && (
@@ -317,8 +334,15 @@ export default function ShoppingListPage() {
                               </p>
                             )}
                           </div>
-                        </div>
-                      </Link>
+                        </Link>
+                        <button
+                          onClick={() => handleRemoveRecipe(recipe.id, recipe.title)}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                          title="Remove recipe from list"
+                        >
+                          <XMarkIcon className="w-5 h-5" />
+                        </button>
+                      </div>
                     ))}
                   </div>
                 </div>
