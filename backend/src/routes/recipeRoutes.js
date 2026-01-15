@@ -7,6 +7,7 @@ const {
   getScaledRecipe,
   updateRecipe,
   deleteRecipe,
+  getIngredientsForRecipes,
 } = require('../controllers/recipeController');
 const {
   getNoteForRecipe,
@@ -42,6 +43,9 @@ router.post(
   validate(extractRecipeSchema),
   extractRecipeFromUrl
 );
+
+// POST /api/v1/recipes/ingredients-preview - Get ingredients for multiple recipes
+router.post('/ingredients-preview', authenticateToken, getIngredientsForRecipes);
 
 // POST /api/v1/recipes - Save a recipe
 router.post('/', authenticateToken, validate(saveRecipeSchema), saveRecipe);

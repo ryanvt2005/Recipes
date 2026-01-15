@@ -49,14 +49,16 @@ export const recipes = {
   getNote: (recipeId) => api.get(`/recipes/${recipeId}/note`),
   upsertNote: (recipeId, noteText) => api.put(`/recipes/${recipeId}/note`, { noteText }),
   deleteNote: (recipeId) => api.delete(`/recipes/${recipeId}/note`),
+  getIngredientsForRecipes: (recipeIds) =>
+    api.post('/recipes/ingredients-preview', { recipeIds }),
 };
 
 // Shopping list endpoints
 export const shoppingLists = {
-  createFromRecipes: (recipeIds, name) =>
-    api.post('/shopping-lists/from-recipes', { recipeIds, name }),
-  addRecipesToList: (listId, recipeIds) =>
-    api.post(`/shopping-lists/${listId}/add-recipes`, { recipeIds }),
+  createFromRecipes: (recipeIds, name, excludedIngredientIds = []) =>
+    api.post('/shopping-lists/from-recipes', { recipeIds, name, excludedIngredientIds }),
+  addRecipesToList: (listId, recipeIds, excludedIngredientIds = []) =>
+    api.post(`/shopping-lists/${listId}/add-recipes`, { recipeIds, excludedIngredientIds }),
   getAll: () => api.get('/shopping-lists'),
   getOne: (id) => api.get(`/shopping-lists/${id}`),
   updateItem: (itemId, data) => api.patch(`/shopping-lists/items/${itemId}`, data),

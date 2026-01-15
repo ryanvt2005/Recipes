@@ -206,9 +206,10 @@ function consolidateIngredients(recipeIngredients) {
 /**
  * Create a shopping list from selected recipes
  * Accepts recipeIds as array of strings OR array of {recipeId, scaledServings} objects
+ * Accepts excludedIngredientIds array to filter out specific ingredients
  */
 async function createFromRecipes(req, res) {
-  const { recipeIds, name } = req.body;
+  const { recipeIds, name, excludedIngredientIds = [] } = req.body;
   const userId = req.user.userId;
 
   try {
@@ -245,8 +246,13 @@ async function createFromRecipes(req, res) {
       return res.status(404).json({ error: 'No ingredients found for selected recipes' });
     }
 
+    // Filter out excluded ingredients
+    const filteredIngredients = ingredientsResult.rows.filter(
+      (ing) => !excludedIngredientIds.includes(ing.id)
+    );
+
     // Scale ingredients if needed
-    const scaledIngredients = ingredientsResult.rows.map((ingredient) => {
+    const scaledIngredients = filteredIngredients.map((ingredient) => {
       const recipeInfo = recipeData.find((r) => r.recipeId === ingredient.recipe_id);
 
       if (!recipeInfo || !recipeInfo.scaledServings) {
@@ -496,11 +502,12 @@ async function deleteShoppingList(req, res) {
 
 /**
  * Add recipes to an existing shopping list
+ * Accepts excludedIngredientIds array to filter out specific ingredients
  */
 async function addRecipesToList(req, res) {
   const userId = req.user.userId;
   const listId = req.params.id;
-  const { recipeIds } = req.body;
+  const { recipeIds, excludedIngredientIds = [] } = req.body;
 
   try {
     // Validate input
@@ -542,8 +549,13 @@ async function addRecipesToList(req, res) {
       return res.status(404).json({ error: 'No ingredients found for selected recipes' });
     }
 
+    // Filter out excluded ingredients
+    const filteredIngredients = ingredientsResult.rows.filter(
+      (ing) => !excludedIngredientIds.includes(ing.id)
+    );
+
     // Scale ingredients if needed
-    const scaledIngredients = ingredientsResult.rows.map((ingredient) => {
+    const scaledIngredients = filteredIngredients.map((ingredient) => {
       const recipeInfo = recipeData.find((r) => r.recipeId === ingredient.recipe_id);
 
       if (!recipeInfo || !recipeInfo.scaledServings) {

@@ -71,11 +71,19 @@ export default function RecipesPage() {
 
       if (selection.isNewList) {
         // Create new shopping list
-        const response = await shoppingLists.createFromRecipes(selectedRecipes, selection.listName);
+        const response = await shoppingLists.createFromRecipes(
+          selectedRecipes,
+          selection.listName,
+          selection.excludedIngredientIds
+        );
         navigate(`/shopping-lists/${response.data.shoppingList.id}`);
       } else {
         // Add to existing shopping list
-        await shoppingLists.addRecipesToList(selection.listId, selectedRecipes);
+        await shoppingLists.addRecipesToList(
+          selection.listId,
+          selectedRecipes,
+          selection.excludedIngredientIds
+        );
         navigate(`/shopping-lists/${selection.listId}`);
       }
 
@@ -283,6 +291,7 @@ export default function RecipesPage() {
           onConfirm={handleListSelection}
           recipeData={{
             defaultName: `Shopping List (${selectedRecipes.length} recipe${selectedRecipes.length > 1 ? 's' : ''})`,
+            recipeIds: selectedRecipes,
           }}
         />
       </div>
