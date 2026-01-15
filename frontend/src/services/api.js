@@ -49,8 +49,7 @@ export const recipes = {
   getNote: (recipeId) => api.get(`/recipes/${recipeId}/note`),
   upsertNote: (recipeId, noteText) => api.put(`/recipes/${recipeId}/note`, { noteText }),
   deleteNote: (recipeId) => api.delete(`/recipes/${recipeId}/note`),
-  getIngredientsForRecipes: (recipeIds) =>
-    api.post('/recipes/ingredients-preview', { recipeIds }),
+  getIngredientsForRecipes: (recipeIds) => api.post('/recipes/ingredients-preview', { recipeIds }),
 };
 
 // Shopping list endpoints

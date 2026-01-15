@@ -58,7 +58,12 @@
   }
 
   /* Optimize page breaks */
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     page-break-after: avoid;
     page-break-inside: avoid;
   }
@@ -69,7 +74,8 @@
   }
 
   /* Ingredient and instruction lists */
-  ul, ol {
+  ul,
+  ol {
     page-break-inside: avoid;
   }
 
@@ -125,13 +131,13 @@
   }
 
   .shopping-item::before {
-    content: "☐ ";
+    content: '☐ ';
     margin-right: 8pt;
     font-size: 14pt;
   }
 
   /* Hide interactive elements on shopping lists */
-  input[type="checkbox"],
+  input[type='checkbox'],
   .line-through {
     display: none !important;
   }
@@ -160,7 +166,8 @@
   }
 
   /* Ensure readability */
-  p, li {
+  p,
+  li {
     orphans: 3;
     widows: 3;
   }

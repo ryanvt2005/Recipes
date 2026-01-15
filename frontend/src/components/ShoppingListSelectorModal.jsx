@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import { shoppingLists, recipes } from '../services/api';
 import Button from './Button';
 
-export default function ShoppingListSelectorModal({ isOpen, onClose, onConfirm, recipeData, externalError = '' }) {
+export default function ShoppingListSelectorModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  recipeData,
+  externalError = '',
+}) {
   const [existingLists, setExistingLists] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedListId, setSelectedListId] = useState('new');
@@ -205,9 +211,7 @@ export default function ShoppingListSelectorModal({ isOpen, onClose, onConfirm, 
                   {showIngredients && (
                     <>
                       {loadingIngredients ? (
-                        <div className="py-4 text-center text-gray-500">
-                          Loading ingredients...
-                        </div>
+                        <div className="py-4 text-center text-gray-500">Loading ingredients...</div>
                       ) : (
                         <div className="space-y-1 max-h-64 overflow-y-auto bg-gray-50 rounded-lg p-3">
                           <div className="flex justify-end mb-2">
