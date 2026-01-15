@@ -7,6 +7,7 @@ import Button from '../components/Button';
 import ShoppingListSelectorModal from '../components/ShoppingListSelectorModal';
 import RecipeNotes from '../components/RecipeNotes';
 import { MinusIcon, PlusIcon, ShoppingCartIcon, PrinterIcon } from '@heroicons/react/24/outline';
+import { formatDuration } from '../utils/timeFormatter';
 
 export default function RecipeDetailPage() {
   const { id } = useParams();
@@ -336,7 +337,7 @@ export default function RecipeDetailPage() {
                 />
               </svg>
               <span>
-                <strong>Prep:</strong> {recipe.prepTime}
+                <strong>Prep:</strong> {formatDuration(recipe.prepTime)}
               </span>
             </div>
           )}
@@ -351,7 +352,7 @@ export default function RecipeDetailPage() {
                 />
               </svg>
               <span>
-                <strong>Cook:</strong> {recipe.cookTime}
+                <strong>Cook:</strong> {formatDuration(recipe.cookTime)}
               </span>
             </div>
           )}
@@ -366,7 +367,7 @@ export default function RecipeDetailPage() {
                 />
               </svg>
               <span>
-                <strong>Total:</strong> {recipe.totalTime}
+                <strong>Total:</strong> {formatDuration(recipe.totalTime)}
               </span>
             </div>
           )}

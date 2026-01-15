@@ -5,6 +5,7 @@ import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
 import ShoppingListSelectorModal from '../components/ShoppingListSelectorModal';
+import { formatDuration } from '../utils/timeFormatter';
 
 export default function RecipesPage() {
   const [recipeList, setRecipeList] = useState([]);
@@ -203,7 +204,7 @@ export default function RecipesPage() {
                                 d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
                               />
                             </svg>
-                            {recipe.totalTime}
+                            {formatDuration(recipe.totalTime)}
                           </span>
                         )}
                         {recipe.servings && (
