@@ -297,7 +297,15 @@ async function createFromRecipes(req, res) {
          (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [shoppingList.id, item.ingredient_name, item.quantity, item.unit, item.category, index, item.recipe_id]
+        [
+          shoppingList.id,
+          item.ingredient_name,
+          item.quantity,
+          item.unit,
+          item.category,
+          index,
+          item.recipe_id,
+        ]
       );
     });
 
@@ -543,7 +551,7 @@ async function addRecipesToList(req, res) {
     );
 
     if (existingRecipesResult.rows.length > 0) {
-      const duplicateRecipeIds = existingRecipesResult.rows.map(row => row.recipe_id);
+      const duplicateRecipeIds = existingRecipesResult.rows.map((row) => row.recipe_id);
 
       // Get recipe names for better error message
       const recipeNamesResult = await pool.query(
@@ -551,19 +559,19 @@ async function addRecipesToList(req, res) {
         [duplicateRecipeIds]
       );
 
-      const recipeNames = recipeNamesResult.rows.map(r => r.title);
+      const recipeNames = recipeNamesResult.rows.map((r) => r.title);
 
       if (duplicateRecipeIds.length === 1) {
         return res.status(400).json({
           error: 'Recipe already in shopping list',
           message: `"${recipeNames[0]}" is already in this shopping list`,
-          duplicateRecipes: recipeNames
+          duplicateRecipes: recipeNames,
         });
       } else {
         return res.status(400).json({
           error: 'Recipes already in shopping list',
           message: `${duplicateRecipeIds.length} recipe(s) are already in this shopping list: ${recipeNames.join(', ')}`,
-          duplicateRecipes: recipeNames
+          duplicateRecipes: recipeNames,
         });
       }
     }
