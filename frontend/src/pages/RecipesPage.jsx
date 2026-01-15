@@ -159,29 +159,46 @@ export default function RecipesPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {recipeList.map((recipe) => (
                 <div key={recipe.id} className="recipe-card relative">
-                  {/* Selection checkbox */}
-                  <div className="absolute top-2 left-2 z-10">
-                    <input
-                      type="checkbox"
-                      checked={selectedRecipes.includes(recipe.id)}
-                      onChange={(e) => {
-                        e.stopPropagation();
-                        toggleRecipeSelection(recipe.id);
-                      }}
-                      className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                    />
-                  </div>
-
                   <Link to={`/recipes/${recipe.id}`} className="block">
-                    {recipe.imageUrl && (
-                      <img
-                        src={recipe.imageUrl}
-                        alt={recipe.title}
-                        className="w-full h-48 object-cover"
-                      />
+                    {recipe.imageUrl ? (
+                      <div className="relative">
+                        <img
+                          src={recipe.imageUrl}
+                          alt={recipe.title}
+                          className="w-full h-48 object-cover"
+                        />
+                        {/* Selection checkbox - positioned over image */}
+                        <div className="absolute top-2 left-2 z-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedRecipes.includes(recipe.id)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleRecipeSelection(recipe.id);
+                            }}
+                            className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500 bg-white"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      /* Selection checkbox - in-line when no image */
+                      <div className="p-4 pb-0 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedRecipes.includes(recipe.id)}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            toggleRecipeSelection(recipe.id);
+                          }}
+                          className="w-5 h-5 mt-1 text-primary-600 border-gray-300 rounded focus:ring-primary-500 flex-shrink-0"
+                        />
+                        <h3 className="font-semibold text-lg line-clamp-2 flex-1">{recipe.title}</h3>
+                      </div>
                     )}
-                    <div className="p-4">
-                      <h3 className="font-semibold text-lg mb-2 line-clamp-2">{recipe.title}</h3>
+                    <div className={recipe.imageUrl ? "p-4" : "p-4 pt-2"}>
+                      {recipe.imageUrl && (
+                        <h3 className="font-semibold text-lg mb-2 line-clamp-2">{recipe.title}</h3>
+                      )}
                       {recipe.description && (
                         <p className="text-gray-600 text-sm mb-3 line-clamp-2">
                           {recipe.description}
