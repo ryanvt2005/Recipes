@@ -14,9 +14,14 @@ export function formatDuration(duration) {
     return duration;
   }
 
-  // Handle ISO 8601 duration format (PT1H30M)
+  // Handle ISO 8601 duration format (PT1H30M or P0Y0M0DT0H25M0.000S)
   const iso8601Pattern = /^PT(?:(\d+)H)?(?:(\d+)M)?$/;
-  const match = duration.match(iso8601Pattern);
+  const extendedIso8601Pattern = /P(?:\d+Y)?(?:\d+M)?(?:\d+D)?T(?:(\d+)H)?(?:(\d+)M)?(?:[\d.]+S)?/;
+
+  let match = duration.match(iso8601Pattern);
+  if (!match) {
+    match = duration.match(extendedIso8601Pattern);
+  }
 
   if (match) {
     const hours = parseInt(match[1]) || 0;
