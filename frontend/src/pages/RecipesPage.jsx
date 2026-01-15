@@ -91,6 +91,7 @@ export default function RecipesPage() {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add to shopping list');
       setCreatingList(false);
+      setShowShoppingListModal(true); // Reopen modal to show error
     }
   };
 
@@ -287,12 +288,16 @@ export default function RecipesPage() {
         {/* Shopping List Modal */}
         <ShoppingListSelectorModal
           isOpen={showShoppingListModal}
-          onClose={() => setShowShoppingListModal(false)}
+          onClose={() => {
+            setShowShoppingListModal(false);
+            setError(''); // Clear error when modal closes
+          }}
           onConfirm={handleListSelection}
           recipeData={{
             defaultName: `Shopping List (${selectedRecipes.length} recipe${selectedRecipes.length > 1 ? 's' : ''})`,
             recipeIds: selectedRecipes,
           }}
+          externalError={error}
         />
       </div>
     </Layout>

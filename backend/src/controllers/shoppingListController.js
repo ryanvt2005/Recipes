@@ -535,6 +535,39 @@ async function addRecipesToList(req, res) {
 
     const justIds = recipeData.map((r) => r.recipeId);
 
+    // Check if any recipes are already in this shopping list
+    const existingRecipesResult = await pool.query(
+      `SELECT recipe_id FROM shopping_list_recipes
+       WHERE shopping_list_id = $1 AND recipe_id = ANY($2)`,
+      [listId, justIds]
+    );
+
+    if (existingRecipesResult.rows.length > 0) {
+      const duplicateRecipeIds = existingRecipesResult.rows.map(row => row.recipe_id);
+
+      // Get recipe names for better error message
+      const recipeNamesResult = await pool.query(
+        `SELECT id, title FROM recipes WHERE id = ANY($1)`,
+        [duplicateRecipeIds]
+      );
+
+      const recipeNames = recipeNamesResult.rows.map(r => r.title);
+
+      if (duplicateRecipeIds.length === 1) {
+        return res.status(400).json({
+          error: 'Recipe already in shopping list',
+          message: `"${recipeNames[0]}" is already in this shopping list`,
+          duplicateRecipes: recipeNames
+        });
+      } else {
+        return res.status(400).json({
+          error: 'Recipes already in shopping list',
+          message: `${duplicateRecipeIds.length} recipe(s) are already in this shopping list: ${recipeNames.join(', ')}`,
+          duplicateRecipes: recipeNames
+        });
+      }
+    }
+
     // Get ingredients AND original servings
     const ingredientsResult = await pool.query(
       `SELECT i.raw_text, i.quantity, i.unit, i.ingredient_name, i.recipe_id, r.servings as recipe_servings
