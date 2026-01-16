@@ -1,10 +1,15 @@
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Menu } from '@headlessui/react';
+import { Bars3Icon } from '@heroicons/react/24/outline';
+import NavLinks from './nav/NavLinks';
+import MobileDrawer from './nav/MobileDrawer';
 
 export default function Layout({ children }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -13,37 +18,23 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-white shadow-sm">
+      <header className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link to="/" className="flex items-center">
-              <span className="text-2xl font-bold text-primary-600">🍳 Recipe Manager</span>
+            {/* Logo */}
+            <Link to="/" className="flex items-center flex-shrink-0">
+              <span className="text-xl sm:text-2xl font-bold text-primary-600">Recipe Manager</span>
             </Link>
 
-            <nav className="flex items-center space-x-4">
+            {/* Desktop Navigation */}
+            <nav className="hidden md:flex items-center space-x-1">
               {user ? (
                 <>
-                  <Link
-                    to="/recipes"
-                    className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium"
-                  >
-                    My Recipes
-                  </Link>
-                  <Link
-                    to="/recipes/new"
-                    className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium"
-                  >
-                    Add Recipe
-                  </Link>
-                  <Link
-                    to="/shopping-lists"
-                    className="text-gray-700 hover:text-primary-600 px-3 py-2 rounded-md text-sm font-medium"
-                  >
-                    Shopping Lists
-                  </Link>
+                  <NavLinks />
 
-                  <Menu as="div" className="relative">
-                    <Menu.Button className="flex items-center text-gray-700 hover:text-primary-600">
+                  {/* User Menu */}
+                  <Menu as="div" className="relative ml-3">
+                    <Menu.Button className="flex items-center text-gray-700 hover:text-primary-600 p-1 rounded-full hover:bg-gray-100">
                       <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
                         <span className="text-primary-600 font-medium text-sm">
                           {user.firstName?.[0] || user.email[0].toUpperCase()}
@@ -51,7 +42,7 @@ export default function Layout({ children }) {
                       </div>
                     </Menu.Button>
 
-                    <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+                    <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
                       <div className="py-1">
                         <Menu.Item>
                           {() => (
@@ -93,12 +84,29 @@ export default function Layout({ children }) {
                 </>
               )}
             </nav>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-2 -mr-2 text-gray-700 hover:text-primary-600 hover:bg-gray-100 rounded-md"
+              aria-label="Open menu"
+            >
+              <Bars3Icon className="h-6 w-6" />
+            </button>
           </div>
         </div>
       </header>
 
+      {/* Mobile Navigation Drawer */}
+      <MobileDrawer
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+        user={user}
+        onLogout={handleLogout}
+      />
+
       <main className="flex-1">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">{children}</div>
       </main>
 
       <footer className="bg-white border-t border-gray-200 mt-auto">
