@@ -71,13 +71,14 @@ export default function RegisterPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="First Name"
               name="firstName"
               value={formData.firstName}
               onChange={handleChange}
               autoComplete="given-name"
+              autoCapitalize="words"
             />
 
             <Input
@@ -86,6 +87,7 @@ export default function RegisterPage() {
               value={formData.lastName}
               onChange={handleChange}
               autoComplete="family-name"
+              autoCapitalize="words"
             />
           </div>
 
