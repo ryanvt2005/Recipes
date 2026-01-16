@@ -162,7 +162,9 @@ export default function ShoppingListPage() {
             {/* Header */}
             <div className="flex justify-between items-start">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 shopping-list-title">{shoppingList?.name}</h1>
+                <h1 className="text-3xl font-bold text-gray-900 shopping-list-title">
+                  {shoppingList?.name}
+                </h1>
                 <p className="text-gray-600 mt-1 no-print">
                   {checkedCount} of {totalCount} items checked
                 </p>
@@ -229,7 +231,9 @@ export default function ShoppingListPage() {
                     <div key={category} className="card">
                       {/* Category Header */}
                       <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900 shopping-category">{category}</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 shopping-category">
+                          {category}
+                        </h3>
                         <span className="text-sm text-gray-600 no-print">
                           {categoryChecked}/{categoryTotal} items
                         </span>

@@ -200,7 +200,7 @@ export default function RecipesPage() {
                     ) : (
                       <div className="h-12"></div>
                     )}
-                    <div className={recipe.imageUrl ? "p-4" : "p-4 pt-8"}>
+                    <div className={recipe.imageUrl ? 'p-4' : 'p-4 pt-8'}>
                       <h3 className="font-semibold text-lg mb-2 line-clamp-2">{recipe.title}</h3>
                       {recipe.description && (
                         <p className="text-gray-600 text-sm mb-3 line-clamp-2">

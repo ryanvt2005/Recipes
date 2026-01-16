@@ -318,7 +318,12 @@ export default function RecipeDetailPage() {
                 ? `Add to List (${currentServings} servings)`
                 : 'Add to Shopping List'}
             </Button>
-            <Button variant="secondary" onClick={handleDelete} loading={deleting} className="no-print">
+            <Button
+              variant="secondary"
+              onClick={handleDelete}
+              loading={deleting}
+              className="no-print"
+            >
               Delete
             </Button>
           </div>
