@@ -13,8 +13,9 @@ async function runMigrations() {
     console.log('✓ Main schema applied');
 
     // Run numbered migrations in order (these handle ALTER TABLE statements)
-    const migrationFiles = fs.readdirSync(__dirname)
-      .filter(f => /^\d+_.*\.sql$/.test(f))
+    const migrationFiles = fs
+      .readdirSync(__dirname)
+      .filter((f) => /^\d+_.*\.sql$/.test(f))
       .sort();
 
     for (const file of migrationFiles) {
@@ -25,9 +26,11 @@ async function runMigrations() {
         console.log(`✓ Applied ${file}`);
       } catch (err) {
         // Ignore errors for "already exists" type issues
-        if (err.message.includes('already exists') ||
-            err.message.includes('duplicate key') ||
-            err.message.includes('does not exist')) {
+        if (
+          err.message.includes('already exists') ||
+          err.message.includes('duplicate key') ||
+          err.message.includes('does not exist')
+        ) {
           console.log(`⏭ Skipped ${file} (already applied or not needed)`);
         } else {
           throw err;
