@@ -156,33 +156,36 @@ export default function ShoppingListPage() {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto">
-        <div className="flex gap-6">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Main Content */}
           <div className="flex-1 space-y-6">
             {/* Header */}
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 shopping-list-title">
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 shopping-list-title">
                   {shoppingList?.name}
                 </h1>
                 <p className="text-gray-600 mt-1 no-print">
                   {checkedCount} of {totalCount} items checked
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 no-print">
                 <Button
                   onClick={handlePrint}
                   variant="outline"
-                  className="flex items-center gap-2 no-print"
+                  className="flex items-center gap-2 min-h-[44px]"
                 >
                   <PrinterIcon className="w-5 h-5" />
-                  Print
+                  <span className="hidden sm:inline">Print</span>
                 </Button>
-                <Link to="/recipes" className="no-print">
-                  <Button variant="secondary">Back to Recipes</Button>
+                <Link to="/recipes">
+                  <Button variant="secondary" className="min-h-[44px]">
+                    <span className="hidden sm:inline">Back to Recipes</span>
+                    <span className="sm:hidden">Recipes</span>
+                  </Button>
                 </Link>
-                <Button variant="danger" onClick={handleDelete} className="no-print">
-                  Delete List
+                <Button variant="danger" onClick={handleDelete} className="min-h-[44px]">
+                  Delete
                 </Button>
               </div>
             </div>
@@ -244,20 +247,22 @@ export default function ShoppingListPage() {
                         {categoryItems.map((item) => (
                           <div
                             key={item.id}
-                            className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                            className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
                               item.is_checked
                                 ? 'bg-gray-50 border-gray-200'
                                 : 'bg-white border-gray-300 hover:border-primary-300'
                             }`}
                           >
-                            <input
-                              type="checkbox"
-                              checked={item.is_checked}
-                              onChange={() => toggleItemChecked(item.id, item.is_checked)}
-                              className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                            />
+                            <label className="flex items-center min-w-[44px] min-h-[44px] justify-center cursor-pointer -m-2">
+                              <input
+                                type="checkbox"
+                                checked={item.is_checked}
+                                onChange={() => toggleItemChecked(item.id, item.is_checked)}
+                                className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                              />
+                            </label>
                             <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                                 <div
                                   className={`font-medium flex-1 shopping-item ${item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'}`}
                                 >
@@ -266,7 +271,7 @@ export default function ShoppingListPage() {
                                 <select
                                   value={item.category || 'Other'}
                                   onChange={(e) => updateItemCategory(item.id, e.target.value)}
-                                  className="text-xs px-2 py-1 border border-gray-300 rounded bg-white hover:border-primary-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 no-print"
+                                  className="text-xs px-2 py-2 min-h-[44px] sm:min-h-0 sm:py-1 border border-gray-300 rounded bg-white hover:border-primary-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 no-print"
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   {CATEGORY_ORDER.map((cat) => (
@@ -308,13 +313,13 @@ export default function ShoppingListPage() {
             </div>
           </div>
 
-          {/* Sidebar - Recipes */}
+          {/* Sidebar - Recipes (shown below on mobile, sidebar on lg+) */}
           {recipes.length > 0 && (
-            <div className="w-80 flex-shrink-0 no-print">
-              <div className="sticky top-6">
+            <div className="w-full lg:w-80 flex-shrink-0 no-print order-first lg:order-last">
+              <div className="lg:sticky lg:top-24">
                 <div className="card">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Recipes in this list</h3>
-                  <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-3">
                     {recipes.map((recipe) => (
                       <div
                         key={recipe.id}
@@ -341,7 +346,7 @@ export default function ShoppingListPage() {
                         </Link>
                         <button
                           onClick={() => handleRemoveRecipe(recipe.id, recipe.title)}
-                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
+                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors flex-shrink-0"
                           title="Remove recipe from list"
                         >
                           <XMarkIcon className="w-5 h-5" />

@@ -294,35 +294,40 @@ export default function RecipeDetailPage() {
         )}
 
         {/* Title and Actions */}
-        <div className="flex justify-between items-start mb-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">{recipe.title}</h1>
-            {recipe.description && <p className="text-gray-600 text-lg">{recipe.description}</p>}
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">{recipe.title}</h1>
+            {recipe.description && (
+              <p className="text-gray-600 text-base sm:text-lg">{recipe.description}</p>
+            )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 no-print">
             <Button
               onClick={handlePrint}
               variant="outline"
-              className="flex items-center gap-2 no-print"
+              className="flex items-center gap-2 min-h-[44px]"
             >
               <PrinterIcon className="w-5 h-5" />
-              Print
+              <span className="hidden sm:inline">Print</span>
             </Button>
             <Button
               onClick={handleAddToShoppingList}
               loading={creatingList}
-              className="flex items-center gap-2 no-print"
+              className="flex items-center gap-2 min-h-[44px]"
             >
               <ShoppingCartIcon className="w-5 h-5" />
-              {recipe.isScaled
-                ? `Add to List (${currentServings} servings)`
-                : 'Add to Shopping List'}
+              <span className="hidden sm:inline">
+                {recipe.isScaled
+                  ? `Add to List (${currentServings} servings)`
+                  : 'Add to Shopping List'}
+              </span>
+              <span className="sm:hidden">Add to List</span>
             </Button>
             <Button
               variant="secondary"
               onClick={handleDelete}
               loading={deleting}
-              className="no-print"
+              className="min-h-[44px]"
             >
               Delete
             </Button>
