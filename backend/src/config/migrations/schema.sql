@@ -133,9 +133,17 @@ CREATE TABLE IF NOT EXISTS shopping_list_items (
   is_checked BOOLEAN DEFAULT FALSE,
   sort_order INTEGER,
   notes TEXT,
-  recipe_id UUID REFERENCES recipes(id) ON DELETE SET NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add recipe_id column if it doesn't exist (for existing databases)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'shopping_list_items' AND column_name = 'recipe_id') THEN
+        ALTER TABLE shopping_list_items ADD COLUMN recipe_id UUID REFERENCES recipes(id) ON DELETE SET NULL;
+    END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_shopping_list_items_list_id ON shopping_list_items(shopping_list_id);
 CREATE INDEX IF NOT EXISTS idx_shopping_list_items_recipe_id ON shopping_list_items(recipe_id);
