@@ -2,6 +2,7 @@ const pool = require('../config/database');
 const { extractRecipe, RecipeExtractionError } = require('../services/recipeExtractionService');
 const logger = require('../config/logger');
 const { scaleRecipe } = require('../utils/recipeScaling');
+const { ErrorCodes, sendError, errors } = require('../utils/errorResponse');
 
 /**
  * Get ingredients for multiple recipes (for preview before adding to shopping list)
@@ -12,7 +13,7 @@ async function getIngredientsForRecipes(req, res) {
 
   try {
     if (!recipeIds || !Array.isArray(recipeIds) || recipeIds.length === 0) {
-      return res.status(400).json({ error: 'recipeIds array is required' });
+      return errors.badRequest(res, 'recipeIds array is required');
     }
 
     const result = await pool.query(
@@ -27,7 +28,7 @@ async function getIngredientsForRecipes(req, res) {
     res.json({ ingredients: result.rows });
   } catch (error) {
     logger.error('Error fetching ingredients for recipes', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch ingredients' });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch ingredients');
   }
 }
 
@@ -51,10 +52,7 @@ async function extractRecipeFromUrl(req, res) {
     }
 
     logger.error('Recipe extraction error', { error: error.message });
-    res.status(500).json({
-      error: 'EXTRACTION_ERROR',
-      message: 'An unexpected error occurred during extraction',
-    });
+    return sendError(res, 500, ErrorCodes.EXTRACTION_ERROR, 'An unexpected error occurred during extraction');
   }
 }
 
@@ -167,10 +165,7 @@ async function saveRecipe(req, res) {
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error('Save recipe error', { error: error.message });
-    res.status(500).json({
-      error: 'SAVE_FAILED',
-      message: 'Failed to save recipe',
-    });
+    return sendError(res, 500, ErrorCodes.SAVE_FAILED, 'Failed to save recipe');
   } finally {
     client.release();
   }
@@ -282,10 +277,7 @@ async function getRecipes(req, res) {
     });
   } catch (error) {
     logger.error('Get recipes error', { error: error.message });
-    res.status(500).json({
-      error: 'FETCH_FAILED',
-      message: 'Failed to fetch recipes',
-    });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch recipes');
   }
 }
 
@@ -300,19 +292,13 @@ async function getRecipe(req, res) {
     const recipe = await getRecipeById(recipeId, userId);
 
     if (!recipe) {
-      return res.status(404).json({
-        error: 'NOT_FOUND',
-        message: 'Recipe not found',
-      });
+      return errors.notFound(res, 'Recipe not found');
     }
 
     res.status(200).json({ recipe });
   } catch (error) {
     logger.error('Get recipe error', { error: error.message });
-    res.status(500).json({
-      error: 'FETCH_FAILED',
-      message: 'Failed to fetch recipe',
-    });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch recipe');
   }
 }
 
@@ -418,10 +404,7 @@ async function updateRecipe(req, res) {
 
     if (existingRecipe.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({
-        error: 'NOT_FOUND',
-        message: 'Recipe not found',
-      });
+      return errors.notFound(res, 'Recipe not found');
     }
 
     // Update recipe
@@ -545,10 +528,7 @@ async function updateRecipe(req, res) {
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error('Update recipe error', { error: error.message });
-    res.status(500).json({
-      error: 'UPDATE_FAILED',
-      message: 'Failed to update recipe',
-    });
+    return sendError(res, 500, ErrorCodes.UPDATE_FAILED, 'Failed to update recipe');
   } finally {
     client.release();
   }
@@ -565,20 +545,14 @@ async function getScaledRecipe(req, res) {
   try {
     // Validate target servings
     if (!targetServings || targetServings <= 0) {
-      return res.status(400).json({
-        error: 'INVALID_SERVINGS',
-        message: 'Target servings must be a positive number',
-      });
+      return sendError(res, 400, ErrorCodes.INVALID_SERVINGS, 'Target servings must be a positive number');
     }
 
     // Get the original recipe
     const recipe = await getRecipeById(recipeId, userId);
 
     if (!recipe) {
-      return res.status(404).json({
-        error: 'NOT_FOUND',
-        message: 'Recipe not found',
-      });
+      return errors.notFound(res, 'Recipe not found');
     }
 
     // Scale the recipe
@@ -587,10 +561,7 @@ async function getScaledRecipe(req, res) {
     res.status(200).json({ recipe: scaledRecipe });
   } catch (error) {
     logger.error('Scale recipe error', { error: error.message });
-    res.status(500).json({
-      error: 'SCALE_FAILED',
-      message: 'Failed to scale recipe',
-    });
+    return sendError(res, 500, ErrorCodes.SCALE_FAILED, 'Failed to scale recipe');
   }
 }
 
@@ -608,10 +579,7 @@ async function deleteRecipe(req, res) {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({
-        error: 'NOT_FOUND',
-        message: 'Recipe not found',
-      });
+      return errors.notFound(res, 'Recipe not found');
     }
 
     logger.info('Recipe deleted', { recipeId, userId });
@@ -619,10 +587,7 @@ async function deleteRecipe(req, res) {
     res.status(204).send();
   } catch (error) {
     logger.error('Delete recipe error', { error: error.message });
-    res.status(500).json({
-      error: 'DELETE_FAILED',
-      message: 'Failed to delete recipe',
-    });
+    return sendError(res, 500, ErrorCodes.DELETE_FAILED, 'Failed to delete recipe');
   }
 }
 

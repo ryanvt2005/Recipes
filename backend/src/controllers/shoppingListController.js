@@ -1,6 +1,7 @@
 const pool = require('../config/database');
 const logger = require('../config/logger');
 const { categorizeIngredient } = require('../utils/ingredientCategorizer');
+const { ErrorCodes, sendError, errors } = require('../utils/errorResponse');
 
 /**
  * Parse quantity from ingredient text
@@ -215,11 +216,11 @@ async function createFromRecipes(req, res) {
   try {
     // Validate input
     if (!recipeIds || !Array.isArray(recipeIds) || recipeIds.length === 0) {
-      return res.status(400).json({ error: 'recipeIds array is required' });
+      return errors.badRequest(res, 'recipeIds array is required');
     }
 
     if (!name || name.trim() === '') {
-      return res.status(400).json({ error: 'Shopping list name is required' });
+      return errors.badRequest(res, 'Shopping list name is required');
     }
 
     // Parse recipeIds - support both string array and object array
@@ -243,7 +244,7 @@ async function createFromRecipes(req, res) {
     );
 
     if (ingredientsResult.rows.length === 0) {
-      return res.status(404).json({ error: 'No ingredients found for selected recipes' });
+      return errors.notFound(res, 'No ingredients found for selected recipes');
     }
 
     // Filter out excluded ingredients
@@ -351,7 +352,7 @@ async function createFromRecipes(req, res) {
       userId,
       recipeIds,
     });
-    res.status(500).json({ error: 'Failed to create shopping list' });
+    return errors.internal(res, 'Failed to create shopping list');
   }
 }
 
@@ -375,7 +376,7 @@ async function getUserShoppingLists(req, res) {
     res.json({ shoppingLists: result.rows });
   } catch (error) {
     logger.error('Error fetching shopping lists', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch shopping lists' });
+    return errors.internal(res, 'Failed to fetch shopping lists');
   }
 }
 
@@ -394,7 +395,7 @@ async function getShoppingList(req, res) {
     );
 
     if (listResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Shopping list not found' });
+      return errors.notFound(res, 'Shopping list not found');
     }
 
     // Get items
@@ -422,7 +423,7 @@ async function getShoppingList(req, res) {
     });
   } catch (error) {
     logger.error('Error fetching shopping list', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch shopping list' });
+    return errors.internal(res, 'Failed to fetch shopping list');
   }
 }
 
@@ -444,7 +445,7 @@ async function updateItem(req, res) {
     );
 
     if (verifyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Shopping list item not found' });
+      return errors.notFound(res, 'Shopping list item not found');
     }
 
     const item = verifyResult.rows[0];
@@ -479,7 +480,7 @@ async function updateItem(req, res) {
     res.json({ item: result.rows[0] });
   } catch (error) {
     logger.error('Error updating shopping list item', { error: error.message });
-    res.status(500).json({ error: 'Failed to update item' });
+    return errors.internal(res, 'Failed to update item');
   }
 }
 
@@ -497,14 +498,14 @@ async function deleteShoppingList(req, res) {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Shopping list not found' });
+      return errors.notFound(res, 'Shopping list not found');
     }
 
     logger.info('Shopping list deleted', { userId, listId: id });
     res.json({ message: 'Shopping list deleted successfully' });
   } catch (error) {
     logger.error('Error deleting shopping list', { error: error.message });
-    res.status(500).json({ error: 'Failed to delete shopping list' });
+    return errors.internal(res, 'Failed to delete shopping list');
   }
 }
 
@@ -520,7 +521,7 @@ async function addRecipesToList(req, res) {
   try {
     // Validate input
     if (!recipeIds || !Array.isArray(recipeIds) || recipeIds.length === 0) {
-      return res.status(400).json({ error: 'recipeIds array is required' });
+      return errors.badRequest(res, 'recipeIds array is required');
     }
 
     // Verify shopping list exists and belongs to user
@@ -530,7 +531,7 @@ async function addRecipesToList(req, res) {
     );
 
     if (listResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Shopping list not found' });
+      return errors.notFound(res, 'Shopping list not found');
     }
 
     // Parse recipeIds - support both string array and object array
@@ -562,15 +563,11 @@ async function addRecipesToList(req, res) {
       const recipeNames = recipeNamesResult.rows.map((r) => r.title);
 
       if (duplicateRecipeIds.length === 1) {
-        return res.status(400).json({
-          error: 'Recipe already in shopping list',
-          message: `"${recipeNames[0]}" is already in this shopping list`,
+        return sendError(res, 400, ErrorCodes.DUPLICATE_RECIPE, `"${recipeNames[0]}" is already in this shopping list`, {
           duplicateRecipes: recipeNames,
         });
       } else {
-        return res.status(400).json({
-          error: 'Recipes already in shopping list',
-          message: `${duplicateRecipeIds.length} recipe(s) are already in this shopping list: ${recipeNames.join(', ')}`,
+        return sendError(res, 400, ErrorCodes.DUPLICATE_RECIPE, `${duplicateRecipeIds.length} recipe(s) are already in this shopping list: ${recipeNames.join(', ')}`, {
           duplicateRecipes: recipeNames,
         });
       }
@@ -587,7 +584,7 @@ async function addRecipesToList(req, res) {
     );
 
     if (ingredientsResult.rows.length === 0) {
-      return res.status(404).json({ error: 'No ingredients found for selected recipes' });
+      return errors.notFound(res, 'No ingredients found for selected recipes');
     }
 
     // Filter out excluded ingredients
@@ -726,7 +723,7 @@ async function addRecipesToList(req, res) {
     });
   } catch (error) {
     logger.error('Error adding recipes to shopping list', { error: error.message });
-    res.status(500).json({ error: 'Failed to add recipes to shopping list' });
+    return errors.internal(res, 'Failed to add recipes to shopping list');
   }
 }
 
@@ -751,7 +748,7 @@ async function removeRecipeFromList(req, res) {
 
     if (listCheck.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Shopping list not found' });
+      return errors.notFound(res, 'Shopping list not found');
     }
 
     // Delete all items from this recipe
@@ -773,7 +770,7 @@ async function removeRecipeFromList(req, res) {
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error('Error removing recipe from shopping list:', error);
-    res.status(500).json({ error: 'Failed to remove recipe from shopping list' });
+    return errors.internal(res, 'Failed to remove recipe from shopping list');
   } finally {
     client.release();
   }

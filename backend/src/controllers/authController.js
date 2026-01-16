@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const pool = require('../config/database');
 const { generateToken } = require('../middlewares/auth');
 const logger = require('../config/logger');
+const { ErrorCodes, errors } = require('../utils/errorResponse');
 
 /**
  * Register a new user
@@ -14,10 +15,7 @@ async function register(req, res) {
     const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
 
     if (existingUser.rows.length > 0) {
-      return res.status(409).json({
-        error: 'User already exists',
-        message: 'A user with this email address already exists',
-      });
+      return errors.conflict(res, 'A user with this email address already exists');
     }
 
     // Hash password
@@ -50,10 +48,7 @@ async function register(req, res) {
     });
   } catch (error) {
     logger.error('Registration error', { error: error.message });
-    res.status(500).json({
-      error: 'Registration failed',
-      message: 'An error occurred during registration',
-    });
+    return errors.internal(res, 'An error occurred during registration');
   }
 }
 
@@ -71,10 +66,7 @@ async function login(req, res) {
     );
 
     if (result.rows.length === 0) {
-      return res.status(401).json({
-        error: 'Invalid credentials',
-        message: 'Email or password is incorrect',
-      });
+      return errors.unauthorized(res, 'Email or password is incorrect');
     }
 
     const user = result.rows[0];
@@ -83,10 +75,7 @@ async function login(req, res) {
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
     if (!isPasswordValid) {
-      return res.status(401).json({
-        error: 'Invalid credentials',
-        message: 'Email or password is incorrect',
-      });
+      return errors.unauthorized(res, 'Email or password is incorrect');
     }
 
     // Generate JWT token
@@ -105,10 +94,7 @@ async function login(req, res) {
     });
   } catch (error) {
     logger.error('Login error', { error: error.message });
-    res.status(500).json({
-      error: 'Login failed',
-      message: 'An error occurred during login',
-    });
+    return errors.internal(res, 'An error occurred during login');
   }
 }
 
