@@ -15,6 +15,8 @@ export {
   formatQuantityWithUnit,
   parseIngredient,
   createIngredientKey,
+  formatIngredientDisplay,
+  formatScaledIngredient,
 } from './ingredients.js';
 
 // Category utilities

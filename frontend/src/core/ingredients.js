@@ -272,3 +272,107 @@ export function createIngredientKey(name, unit, recipeId) {
   const baseKey = `${name}|${unit || 'none'}`;
   return recipeId !== undefined ? `${baseKey}|${recipeId}` : baseKey;
 }
+
+/**
+ * Format an ingredient object for display in the standard format:
+ * "<quantity> <unit> <ingredient name>"
+ *
+ * Examples:
+ * - "1 tbsp Paprika"
+ * - "3 cups Milk"
+ * - "½ tsp Salt"
+ * - "2 Eggs"
+ * - "Salt to taste" (fallback to rawText)
+ *
+ * @param {Object} ingredient - Ingredient object from API
+ * @param {string} [ingredient.rawText] - Original raw text (fallback)
+ * @param {number|null} [ingredient.quantity] - Numeric quantity
+ * @param {string|null} [ingredient.unit] - Unit string
+ * @param {string} [ingredient.ingredientName] - Ingredient name
+ * @param {string} [ingredient.ingredient] - Alternative ingredient name field
+ * @param {string|null} [ingredient.preparation] - Preparation method
+ * @returns {string} Formatted ingredient string
+ */
+export function formatIngredientDisplay(ingredient) {
+  if (!ingredient) return '';
+
+  const quantity = ingredient.quantity;
+  const unit = ingredient.unit;
+  const name = ingredient.ingredientName || ingredient.ingredient || '';
+  const rawText = ingredient.rawText || '';
+  const preparation = ingredient.preparation;
+
+  // If no structured data, fall back to raw text
+  if (quantity === null && !unit && !name) {
+    return rawText;
+  }
+
+  const parts = [];
+
+  // Add formatted quantity
+  if (quantity !== null && quantity !== undefined) {
+    parts.push(decimalToFraction(quantity));
+  }
+
+  // Add unit (capitalize for display)
+  if (unit) {
+    parts.push(unit);
+  }
+
+  // Add ingredient name (capitalize first letter)
+  if (name) {
+    const capitalizedName = name.charAt(0).toUpperCase() + name.slice(1);
+    parts.push(capitalizedName);
+  }
+
+  // If we have nothing useful, return raw text
+  if (parts.length === 0) {
+    return rawText;
+  }
+
+  let result = parts.join(' ');
+
+  // Add preparation notes if present
+  if (preparation) {
+    result += `, ${preparation}`;
+  }
+
+  return result;
+}
+
+/**
+ * Format an ingredient with scaling information
+ * Shows the scaled quantity and optionally the original
+ *
+ * @param {Object} ingredient - Ingredient object
+ * @param {boolean} [showOriginal=false] - Whether to show original quantity
+ * @returns {{display: string, scaled: boolean, originalDisplay: string|null}} Formatted display info
+ */
+export function formatScaledIngredient(ingredient, showOriginal = false) {
+  if (!ingredient) {
+    return { display: '', scaled: false, originalDisplay: null };
+  }
+
+  const display = formatIngredientDisplay(ingredient);
+  const isScaled =
+    ingredient.originalQuantity !== undefined &&
+    ingredient.originalQuantity !== null &&
+    ingredient.quantity !== ingredient.originalQuantity;
+
+  let originalDisplay = null;
+
+  if (isScaled && showOriginal) {
+    const originalParts = [];
+    originalParts.push(decimalToFraction(ingredient.originalQuantity));
+    if (ingredient.unit) {
+      originalParts.push(ingredient.unit);
+    }
+    originalDisplay = originalParts.join(' ');
+  }
+
+  return {
+    display,
+    scaled: isScaled,
+    originalDisplay,
+  };
+}

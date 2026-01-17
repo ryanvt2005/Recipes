@@ -16,6 +16,8 @@ import {
   formatQuantityWithUnit,
   parseIngredient,
   createIngredientKey,
+  formatIngredientDisplay,
+  formatScaledIngredient,
 } from '../../frontend/src/core/ingredients.js';
 
 import {
@@ -397,6 +399,165 @@ describe('sortByCategory', () => {
     const sorted = sortByCategory(items);
     assert.equal(sorted[0].ingredient_name, 'apple');
     assert.equal(sorted[1].ingredient_name, 'zucchini');
+  });
+});
+
+// ============================================
+// Ingredient Display Formatting Tests
+// ============================================
+
+describe('formatIngredientDisplay', () => {
+  it('should format ingredient with quantity, unit, and name', () => {
+    const result = formatIngredientDisplay({
+      quantity: 2,
+      unit: 'cup',
+      ingredientName: 'flour',
+    });
+    assert.equal(result, '2 cup Flour');
+  });
+
+  it('should format fractional quantities', () => {
+    const result = formatIngredientDisplay({
+      quantity: 0.5,
+      unit: 'tbsp',
+      ingredientName: 'olive oil',
+    });
+    assert.equal(result, '½ tbsp Olive oil');
+  });
+
+  it('should handle mixed numbers', () => {
+    const result = formatIngredientDisplay({
+      quantity: 1.5,
+      unit: 'cup',
+      ingredientName: 'milk',
+    });
+    assert.equal(result, '1 ½ cup Milk');
+  });
+
+  it('should handle null quantity', () => {
+    const result = formatIngredientDisplay({
+      quantity: null,
+      unit: 'pinch',
+      ingredientName: 'salt',
+    });
+    assert.equal(result, 'pinch Salt');
+  });
+
+  it('should handle null unit', () => {
+    const result = formatIngredientDisplay({
+      quantity: 2,
+      unit: null,
+      ingredientName: 'eggs',
+    });
+    assert.equal(result, '2 Eggs');
+  });
+
+  it('should fall back to rawText when no structured data', () => {
+    const result = formatIngredientDisplay({
+      quantity: null,
+      unit: null,
+      ingredientName: null,
+      rawText: 'salt and pepper to taste',
+    });
+    assert.equal(result, 'salt and pepper to taste');
+  });
+
+  it('should include preparation notes', () => {
+    const result = formatIngredientDisplay({
+      quantity: 1,
+      unit: 'cup',
+      ingredientName: 'onion',
+      preparation: 'diced',
+    });
+    assert.equal(result, '1 cup Onion, diced');
+  });
+
+  it('should handle empty ingredient', () => {
+    assert.equal(formatIngredientDisplay(null), '');
+    assert.equal(formatIngredientDisplay(undefined), '');
+  });
+
+  it('should use alternative ingredient field name', () => {
+    const result = formatIngredientDisplay({
+      quantity: 3,
+      unit: 'clove',
+      ingredient: 'garlic',
+    });
+    assert.equal(result, '3 clove Garlic');
+  });
+});
+
+describe('formatScaledIngredient', () => {
+  it('should return display string for unscaled ingredient', () => {
+    const result = formatScaledIngredient({
+      quantity: 2,
+      unit: 'cup',
+      ingredientName: 'flour',
+    });
+    assert.equal(result.display, '2 cup Flour');
+    assert.equal(result.scaled, false);
+    assert.equal(result.originalDisplay, null);
+  });
+
+  it('should detect scaled ingredient', () => {
+    const result = formatScaledIngredient({
+      quantity: 4,
+      unit: 'cup',
+      ingredientName: 'flour',
+      originalQuantity: 2,
+    });
+    assert.equal(result.display, '4 cup Flour');
+    assert.equal(result.scaled, true);
+  });
+
+  it('should provide original display when showOriginal is true', () => {
+    const result = formatScaledIngredient(
+      {
+        quantity: 4,
+        unit: 'cup',
+        ingredientName: 'flour',
+        originalQuantity: 2,
+      },
+      true
+    );
+    assert.equal(result.display, '4 cup Flour');
+    assert.equal(result.scaled, true);
+    assert.equal(result.originalDisplay, '2 cup');
+  });
+
+  it('should not show original when quantities match', () => {
+    const result = formatScaledIngredient(
+      {
+        quantity: 2,
+        unit: 'cup',
+        ingredientName: 'flour',
+        originalQuantity: 2,
+      },
+      true
+    );
+    assert.equal(result.scaled, false);
+    assert.equal(result.originalDisplay, null);
+  });
+
+  it('should handle null ingredient', () => {
+    const result = formatScaledIngredient(null);
+    assert.equal(result.display, '');
+    assert.equal(result.scaled, false);
+    assert.equal(result.originalDisplay, null);
+  });
+
+  it('should handle fractional original quantities', () => {
+    const result = formatScaledIngredient(
+      {
+        quantity: 1,
+        unit: 'cup',
+        ingredientName: 'sugar',
+        originalQuantity: 0.5,
+      },
+      true
+    );
+    assert.equal(result.scaled, true);
+    assert.equal(result.originalDisplay, '½ cup');
   });
 });
 
