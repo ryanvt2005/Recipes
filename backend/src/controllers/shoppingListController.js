@@ -2,6 +2,7 @@ const pool = require('../config/database');
 const logger = require('../config/logger');
 const { categorizeIngredient } = require('../utils/ingredientCategorizer');
 const { ErrorCodes, sendError, errors } = require('../utils/errorResponse');
+const { aggregateIngredients, normalizeIngredientName, areUnitsCompatible } = require('../utils/ingredientAggregator');
 
 /**
  * Parse quantity from ingredient text
@@ -171,37 +172,78 @@ function parseIngredient(rawText, ingredientName) {
 }
 
 /**
- * Consolidate ingredients from multiple recipes
- * Combines ingredients with the same name and unit
+ * Consolidate ingredients from multiple recipes using the v2 aggregation engine
+ * Combines ingredients with the same canonical name, handles bell pepper variants,
+ * normalizes "salt and pepper" style compounds, and sums compatible units
+ *
+ * @param {Array} recipeIngredients - Raw ingredients from database
+ * @param {Object} options - Aggregation options
+ * @param {boolean} options.keepRecipeSeparate - If true, don't merge across recipes (for initial creation)
+ * @returns {Array} Consolidated ingredient items ready for database insertion
  */
-function consolidateIngredients(recipeIngredients) {
-  const consolidated = {};
+function consolidateIngredients(recipeIngredients, options = {}) {
+  const { keepRecipeSeparate = true } = options;
 
-  recipeIngredients.forEach((ing) => {
+  // Transform database format to aggregator input format
+  const lines = recipeIngredients.map((ing) => {
     const parsed = parseIngredient(ing.raw_text, ing.ingredient_name);
-
-    // Create a key based on ingredient name, unit, AND recipe_id to keep items from different recipes separate
-    const key = `${parsed.name}|${parsed.unit || 'none'}|${ing.recipe_id || 'unknown'}`;
-
-    if (consolidated[key]) {
-      // Add quantities if both exist
-      if (parsed.quantity !== null && consolidated[key].quantity !== null) {
-        consolidated[key].quantity += parsed.quantity;
-      } else if (parsed.quantity !== null) {
-        consolidated[key].quantity = parsed.quantity;
-      }
-    } else {
-      consolidated[key] = {
-        ingredient_name: parsed.name,
-        quantity: parsed.quantity,
-        unit: parsed.unit,
-        category: categorizeIngredient(parsed.name),
-        recipe_id: ing.recipe_id, // Preserve recipe_id
-      };
-    }
+    return {
+      recipeId: ing.recipe_id,
+      originalText: ing.raw_text,
+      name: parsed.name || ing.ingredient_name,
+      quantity: parsed.quantity ?? ing.quantity,
+      unit: parsed.unit ?? ing.unit,
+    };
   });
 
-  return Object.values(consolidated);
+  if (keepRecipeSeparate) {
+    // For initial creation: keep items from different recipes separate
+    // Group by recipe first, then aggregate within each recipe
+    const byRecipe = new Map();
+    lines.forEach((line) => {
+      const recipeId = line.recipeId || 'unknown';
+      if (!byRecipe.has(recipeId)) {
+        byRecipe.set(recipeId, []);
+      }
+      byRecipe.get(recipeId).push(line);
+    });
+
+    const results = [];
+    for (const [recipeId, recipeLines] of byRecipe) {
+      const aggregated = aggregateIngredients(recipeLines);
+      aggregated.forEach((item) => {
+        results.push({
+          ingredient_name: item.displayName.toLowerCase(),
+          display_name: item.displayName,
+          canonical_key: item.canonicalKey,
+          quantity: item.totalQuantity,
+          unit: item.unit,
+          category: categorizeIngredient(item.canonicalKey),
+          recipe_id: recipeId,
+          components: item.components,
+          notes: item.notes,
+          source_lines: item.sourceLines,
+        });
+      });
+    }
+    return results;
+  }
+
+  // For merging: aggregate across all recipes
+  const aggregated = aggregateIngredients(lines);
+
+  return aggregated.map((item) => ({
+    ingredient_name: item.displayName.toLowerCase(),
+    display_name: item.displayName,
+    canonical_key: item.canonicalKey,
+    quantity: item.totalQuantity,
+    unit: item.unit,
+    category: categorizeIngredient(item.canonicalKey),
+    recipe_id: null, // Merged across recipes
+    components: item.components,
+    notes: item.notes,
+    source_lines: item.sourceLines,
+  }));
 }
 
 /**
@@ -622,17 +664,21 @@ async function addRecipesToList(req, res) {
     );
 
     const existingItems = existingItemsResult.rows;
-    const newIngredients = consolidateIngredients(scaledIngredients);
+    // Use aggregation engine without recipe separation for merging
+    const newIngredients = consolidateIngredients(scaledIngredients, { keepRecipeSeparate: false });
 
-    // Merge with existing items
+    // Merge with existing items using canonical keys for matching
     const mergedItems = {};
 
-    // Add existing items to merged
+    // Add existing items to merged - normalize their names for matching
     existingItems.forEach((item) => {
-      const key = `${item.ingredient_name}|${item.unit || 'none'}`;
+      const { canonicalKey } = normalizeIngredientName(item.ingredient_name);
+      const key = `${canonicalKey}|${item.unit || 'none'}`;
       mergedItems[key] = {
         id: item.id,
         ingredient_name: item.ingredient_name,
+        display_name: item.display_name || item.ingredient_name,
+        canonical_key: canonicalKey,
         quantity: item.quantity,
         unit: item.unit,
         category: item.category,
@@ -640,25 +686,53 @@ async function addRecipesToList(req, res) {
       };
     });
 
-    // Add or merge new ingredients
+    // Add or merge new ingredients using canonical keys
     newIngredients.forEach((ing) => {
-      const key = `${ing.ingredient_name}|${ing.unit || 'none'}`;
+      const canonicalKey = ing.canonical_key;
+      const key = `${canonicalKey}|${ing.unit || 'none'}`;
 
       if (mergedItems[key]) {
-        // Update existing item quantity
-        if (ing.quantity !== null && mergedItems[key].quantity !== null) {
-          mergedItems[key].quantity += ing.quantity;
-        } else if (ing.quantity !== null) {
-          mergedItems[key].quantity = ing.quantity;
+        // Check if units are compatible for summing
+        if (areUnitsCompatible(mergedItems[key].unit, ing.unit)) {
+          // Update existing item quantity
+          if (ing.quantity !== null && mergedItems[key].quantity !== null) {
+            mergedItems[key].quantity += ing.quantity;
+          } else if (ing.quantity !== null) {
+            mergedItems[key].quantity = ing.quantity;
+          }
+          // Update notes if we have component breakdown
+          if (ing.notes) {
+            mergedItems[key].notes = ing.notes;
+          }
+          if (ing.components) {
+            mergedItems[key].components = ing.components;
+          }
+        } else {
+          // Units not compatible - add as separate item with different key
+          const altKey = `${canonicalKey}|${ing.unit || 'none'}|new`;
+          mergedItems[altKey] = {
+            ingredient_name: ing.ingredient_name,
+            display_name: ing.display_name,
+            canonical_key: canonicalKey,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            category: ing.category || categorizeIngredient(canonicalKey),
+            components: ing.components,
+            notes: ing.notes,
+            existing: false,
+          };
         }
       } else {
         // Add new item
         mergedItems[key] = {
           ingredient_name: ing.ingredient_name,
+          display_name: ing.display_name,
+          canonical_key: canonicalKey,
           quantity: ing.quantity,
           unit: ing.unit,
-          category: ing.category || categorizeIngredient(ing.ingredient_name),
-          recipe_id: ing.recipe_id, // Track which recipe this ingredient came from
+          category: ing.category || categorizeIngredient(canonicalKey),
+          components: ing.components,
+          notes: ing.notes,
           existing: false,
         };
       }
