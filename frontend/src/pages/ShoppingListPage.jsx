@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { shoppingLists } from '../services/api';
+import { formatQuantityWithUnit } from '../core';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
@@ -88,12 +89,8 @@ export default function ShoppingListPage() {
     }
   };
 
-  const formatQuantity = (quantity, unit) => {
-    if (!quantity) return '';
-    const qty = typeof quantity === 'string' ? parseFloat(quantity) : quantity;
-    const formatted = qty % 1 === 0 ? qty.toString() : qty.toFixed(2);
-    return unit ? `${formatted} ${unit}` : formatted;
-  };
+  // Use the core formatQuantityWithUnit function for consistent formatting
+  const formatQuantity = formatQuantityWithUnit;
 
   const checkedCount = items.filter((item) => item.is_checked).length;
   const totalCount = items.length;

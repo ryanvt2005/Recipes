@@ -1,19 +1,8 @@
 import { useState } from 'react';
+import { getCategoryList } from '../../core';
 
-const CATEGORY_ORDER = [
-  'Produce',
-  'Meat & Seafood',
-  'Dairy & Eggs',
-  'Bakery',
-  'Frozen',
-  'Canned & Jarred',
-  'Pantry',
-  'Spices & Seasonings',
-  'Condiments & Sauces',
-  'Beverages',
-  'Snacks',
-  'Other',
-];
+// Get categories in display order from core module
+const CATEGORY_ORDER = getCategoryList();
 
 export default function ShoppingItemsList({
   items,
