@@ -1,0 +1,33 @@
+{
+  "name": "recipes",
+  "version": "1.0.0",
+  "description": "[![CI/CD Pipeline](https://github.com/ryanvt2005/Recipes/actions/workflows/main.yml/badge.svg)](https://github.com/ryanvt2005/Recipes/actions/workflows/main.yml)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test:e2e": "playwright test",
+    "test:e2e:chromium": "playwright test --project=chromium",
+    "test:e2e:mobile": "playwright test --project=mobile-chrome",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ryanvt2005/Recipes.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/ryanvt2005/Recipes/issues"
+  },
+  "homepage": "https://github.com/ryanvt2005/Recipes#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@types/node": "^25.0.9",
+    "typescript": "^5.9.3"
+  }
+}
