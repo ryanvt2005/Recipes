@@ -122,17 +122,45 @@ export default function ShoppingItemsList({
                         >
                           {item.ingredient_name}
                         </div>
-                        {(item.quantity || item.unit) && (
+                        {/* Quantity display - handle null quantity with components */}
+                        {(item.quantity || item.unit || (item.components && item.components.length > 0)) && (
                           <div
                             className={`text-sm mt-0.5 ${
                               item.is_checked ? 'text-gray-400' : 'text-gray-600'
                             }`}
                           >
-                            {formatQuantity(item.quantity, item.unit)}
+                            {item.quantity === null && item.components && item.components.length > 0
+                              ? 'See breakdown below'
+                              : formatQuantity(item.quantity, item.unit)}
                           </div>
                         )}
+                        {/* Component breakdown for aggregated items (e.g., bell pepper colors) */}
+                        {item.components && item.components.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            {item.components.map((comp, idx) => (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                  item.is_checked
+                                    ? 'bg-gray-100 text-gray-400'
+                                    : 'bg-primary-50 text-primary-700 border border-primary-200'
+                                }`}
+                              >
+                                {comp.quantity && `${comp.quantity} `}
+                                {comp.label}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        {/* Notes - show breakdown text or custom notes */}
                         {item.notes && (
-                          <div className="text-sm text-gray-500 mt-1">{item.notes}</div>
+                          <div
+                            className={`text-sm mt-1 ${
+                              item.is_checked ? 'text-gray-400' : 'text-gray-500'
+                            }`}
+                          >
+                            {item.notes}
+                          </div>
                         )}
                       </div>
                       {/* Category selector - only on desktop or when not in mobile tab view */}
