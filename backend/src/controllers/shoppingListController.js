@@ -803,7 +803,7 @@ async function addRecipesToList(req, res) {
 
 /**
  * Remove a recipe from a shopping list
- * Deletes all items associated with that recipe
+ * Recomputes the shopping list by re-aggregating remaining recipes
  */
 async function removeRecipeFromList(req, res) {
   const client = await pool.connect();
@@ -825,26 +825,267 @@ async function removeRecipeFromList(req, res) {
       return errors.notFound(res, 'Shopping list not found');
     }
 
-    // Delete all items from this recipe
-    await client.query(
-      'DELETE FROM shopping_list_items WHERE shopping_list_id = $1 AND recipe_id = $2',
+    // Get remaining recipes after removing this one
+    const remainingRecipesResult = await client.query(
+      `SELECT recipe_id, scaled_servings FROM shopping_list_recipes
+       WHERE shopping_list_id = $1 AND recipe_id != $2`,
       [shoppingListId, recipeId]
     );
 
-    // Remove from shopping_list_recipes join table
+    const remainingRecipes = remainingRecipesResult.rows;
+
+    // Delete all current items from the shopping list
+    await client.query(
+      'DELETE FROM shopping_list_items WHERE shopping_list_id = $1',
+      [shoppingListId]
+    );
+
+    // Remove the recipe from shopping_list_recipes join table
     await client.query(
       'DELETE FROM shopping_list_recipes WHERE shopping_list_id = $1 AND recipe_id = $2',
       [shoppingListId, recipeId]
     );
 
+    // If there are remaining recipes, recompute the shopping list
+    if (remainingRecipes.length > 0) {
+      const recipeIds = remainingRecipes.map((r) => r.recipe_id);
+
+      // Get ingredients from remaining recipes
+      const ingredientsResult = await client.query(
+        `SELECT i.raw_text, i.quantity, i.unit, i.ingredient_name, i.recipe_id, r.servings as recipe_servings
+         FROM ingredients i
+         INNER JOIN recipes r ON i.recipe_id = r.id
+         WHERE r.id = ANY($1) AND r.user_id = $2
+         ORDER BY i.sort_order`,
+        [recipeIds, userId]
+      );
+
+      if (ingredientsResult.rows.length > 0) {
+        // Scale ingredients if needed
+        const { parseServings } = require('../utils/recipeScaling');
+        const scaledIngredients = ingredientsResult.rows.map((ingredient) => {
+          const recipeInfo = remainingRecipes.find((r) => r.recipe_id === ingredient.recipe_id);
+
+          if (!recipeInfo || !recipeInfo.scaled_servings) {
+            return ingredient;
+          }
+
+          const originalServings = parseServings(ingredient.recipe_servings);
+          if (!originalServings) {
+            return ingredient;
+          }
+
+          const scaleFactor = recipeInfo.scaled_servings / originalServings;
+          return {
+            ...ingredient,
+            quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity,
+          };
+        });
+
+        // Re-aggregate with keepRecipeSeparate: true to maintain recipe provenance
+        const consolidatedIngredients = consolidateIngredients(scaledIngredients, { keepRecipeSeparate: true });
+
+        // Insert the recomputed items
+        for (let index = 0; index < consolidatedIngredients.length; index++) {
+          const item = consolidatedIngredients[index];
+          await client.query(
+            `INSERT INTO shopping_list_items
+             (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            [
+              shoppingListId,
+              item.ingredient_name,
+              item.quantity,
+              item.unit,
+              item.category,
+              index,
+              item.recipe_id,
+            ]
+          );
+        }
+      }
+    }
+
     await client.query('COMMIT');
 
-    logger.info(`Removed recipe ${recipeId} from shopping list ${shoppingListId}`);
-    res.json({ message: 'Recipe removed from shopping list' });
+    // Get the updated items to return
+    const updatedItemsResult = await pool.query(
+      `SELECT * FROM shopping_list_items
+       WHERE shopping_list_id = $1
+       ORDER BY sort_order, ingredient_name`,
+      [shoppingListId]
+    );
+
+    // Get remaining associated recipes
+    const recipesResult = await pool.query(
+      `SELECT r.id, r.title, r.image_url, slr.scaled_servings, slr.added_at
+       FROM shopping_list_recipes slr
+       INNER JOIN recipes r ON slr.recipe_id = r.id
+       WHERE slr.shopping_list_id = $1
+       ORDER BY slr.added_at`,
+      [shoppingListId]
+    );
+
+    logger.info(`Removed recipe ${recipeId} from shopping list ${shoppingListId}, recomputed with ${remainingRecipes.length} remaining recipes`);
+
+    res.json({
+      message: 'Recipe removed from shopping list',
+      items: updatedItemsResult.rows,
+      recipes: recipesResult.rows,
+    });
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error('Error removing recipe from shopping list:', error);
     return errors.internal(res, 'Failed to remove recipe from shopping list');
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Recompute a shopping list from its associated recipes
+ * Useful for refreshing a list after recipe changes or applying new aggregation rules
+ */
+async function recomputeShoppingList(req, res) {
+  const client = await pool.connect();
+
+  try {
+    const { id: shoppingListId } = req.params;
+    const userId = req.user.userId;
+
+    await client.query('BEGIN');
+
+    // Verify shopping list belongs to user
+    const listCheck = await client.query(
+      'SELECT * FROM shopping_lists WHERE id = $1 AND user_id = $2',
+      [shoppingListId, userId]
+    );
+
+    if (listCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return errors.notFound(res, 'Shopping list not found');
+    }
+
+    // Get all associated recipes
+    const recipesResult = await client.query(
+      `SELECT recipe_id, scaled_servings FROM shopping_list_recipes
+       WHERE shopping_list_id = $1`,
+      [shoppingListId]
+    );
+
+    const recipes = recipesResult.rows;
+
+    if (recipes.length === 0) {
+      // No recipes - just clear items
+      await client.query(
+        'DELETE FROM shopping_list_items WHERE shopping_list_id = $1',
+        [shoppingListId]
+      );
+
+      await client.query('COMMIT');
+
+      return res.json({
+        message: 'Shopping list recomputed (no recipes)',
+        items: [],
+        recipes: [],
+      });
+    }
+
+    const recipeIds = recipes.map((r) => r.recipe_id);
+
+    // Get ingredients from all recipes
+    const ingredientsResult = await client.query(
+      `SELECT i.raw_text, i.quantity, i.unit, i.ingredient_name, i.recipe_id, r.servings as recipe_servings
+       FROM ingredients i
+       INNER JOIN recipes r ON i.recipe_id = r.id
+       WHERE r.id = ANY($1) AND r.user_id = $2
+       ORDER BY i.sort_order`,
+      [recipeIds, userId]
+    );
+
+    // Delete all current items
+    await client.query(
+      'DELETE FROM shopping_list_items WHERE shopping_list_id = $1',
+      [shoppingListId]
+    );
+
+    if (ingredientsResult.rows.length > 0) {
+      // Scale ingredients if needed
+      const { parseServings } = require('../utils/recipeScaling');
+      const scaledIngredients = ingredientsResult.rows.map((ingredient) => {
+        const recipeInfo = recipes.find((r) => r.recipe_id === ingredient.recipe_id);
+
+        if (!recipeInfo || !recipeInfo.scaled_servings) {
+          return ingredient;
+        }
+
+        const originalServings = parseServings(ingredient.recipe_servings);
+        if (!originalServings) {
+          return ingredient;
+        }
+
+        const scaleFactor = recipeInfo.scaled_servings / originalServings;
+        return {
+          ...ingredient,
+          quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity,
+        };
+      });
+
+      // Re-aggregate
+      const consolidatedIngredients = consolidateIngredients(scaledIngredients, { keepRecipeSeparate: true });
+
+      // Insert the recomputed items
+      for (let index = 0; index < consolidatedIngredients.length; index++) {
+        const item = consolidatedIngredients[index];
+        await client.query(
+          `INSERT INTO shopping_list_items
+           (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            shoppingListId,
+            item.ingredient_name,
+            item.quantity,
+            item.unit,
+            item.category,
+            index,
+            item.recipe_id,
+          ]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    // Get the updated items
+    const updatedItemsResult = await pool.query(
+      `SELECT * FROM shopping_list_items
+       WHERE shopping_list_id = $1
+       ORDER BY sort_order, ingredient_name`,
+      [shoppingListId]
+    );
+
+    // Get associated recipes with details
+    const recipeDetailsResult = await pool.query(
+      `SELECT r.id, r.title, r.image_url, slr.scaled_servings, slr.added_at
+       FROM shopping_list_recipes slr
+       INNER JOIN recipes r ON slr.recipe_id = r.id
+       WHERE slr.shopping_list_id = $1
+       ORDER BY slr.added_at`,
+      [shoppingListId]
+    );
+
+    logger.info(`Recomputed shopping list ${shoppingListId} with ${recipes.length} recipes`);
+
+    res.json({
+      message: `Shopping list recomputed with ${updatedItemsResult.rows.length} items`,
+      shoppingList: listCheck.rows[0],
+      items: updatedItemsResult.rows,
+      recipes: recipeDetailsResult.rows,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('Error recomputing shopping list:', error);
+    return errors.internal(res, 'Failed to recompute shopping list');
   } finally {
     client.release();
   }
@@ -858,4 +1099,5 @@ module.exports = {
   deleteShoppingList,
   addRecipesToList,
   removeRecipeFromList,
+  recomputeShoppingList,
 };
