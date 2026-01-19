@@ -33,34 +33,6 @@ async function getIngredientsForRecipes(req, res) {
 }
 
 /**
- * Get ingredients for multiple recipes (for preview before adding to shopping list)
- */
-async function getIngredientsForRecipes(req, res) {
-  const userId = req.user.userId;
-  const { recipeIds } = req.body;
-
-  try {
-    if (!recipeIds || !Array.isArray(recipeIds) || recipeIds.length === 0) {
-      return res.status(400).json({ error: 'recipeIds array is required' });
-    }
-
-    const result = await pool.query(
-      `SELECT i.id, i.raw_text, i.ingredient_name, i.recipe_id, r.title as recipe_title
-       FROM ingredients i
-       INNER JOIN recipes r ON i.recipe_id = r.id
-       WHERE r.id = ANY($1) AND r.user_id = $2
-       ORDER BY r.title, i.sort_order`,
-      [recipeIds, userId]
-    );
-
-    res.json({ ingredients: result.rows });
-  } catch (error) {
-    logger.error('Error fetching ingredients for recipes', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch ingredients' });
-  }
-}
-
-/**
  * Extract recipe from URL
  */
 async function extractRecipeFromUrl(req, res) {

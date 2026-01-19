@@ -2,7 +2,7 @@ const bcrypt = require('bcrypt');
 const pool = require('../config/database');
 const { generateToken } = require('../middlewares/auth');
 const logger = require('../config/logger');
-const { ErrorCodes, errors } = require('../utils/errorResponse');
+const { errors } = require('../utils/errorResponse');
 
 /**
  * Register a new user
