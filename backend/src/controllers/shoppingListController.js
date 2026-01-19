@@ -178,21 +178,30 @@ function parseIngredient(rawText, ingredientName) {
  *
  * @param {Array} recipeIngredients - Raw ingredients from database
  * @param {Object} options - Aggregation options
- * @param {boolean} options.keepRecipeSeparate - If true, don't merge across recipes (for initial creation)
+ * @param {boolean} options.keepRecipeSeparate - If true, don't merge across recipes (default: false to enable cross-recipe aggregation)
  * @returns {Array} Consolidated ingredient items ready for database insertion
  */
 function consolidateIngredients(recipeIngredients, options = {}) {
-  const { keepRecipeSeparate = true } = options;
+  const { keepRecipeSeparate = false } = options;
 
   // Transform database format to aggregator input format
   const lines = recipeIngredients.map((ing) => {
     const parsed = parseIngredient(ing.raw_text, ing.ingredient_name);
+    // Prefer database quantity/unit over parsed values (database has the authoritative data)
+    // Only use parsed values as fallback if database values are missing
+    // Ensure quantity is a number, not a string (PostgreSQL numeric can return as string)
+    let quantity = ing.quantity ?? parsed.quantity;
+    if (quantity !== null && quantity !== undefined) {
+      quantity = typeof quantity === 'string' ? parseFloat(quantity) : Number(quantity);
+      if (isNaN(quantity)) quantity = null;
+    }
+
     return {
       recipeId: ing.recipe_id,
       originalText: ing.raw_text,
       name: parsed.name || ing.ingredient_name,
-      quantity: parsed.quantity ?? ing.quantity,
-      unit: parsed.unit ?? ing.unit,
+      quantity,
+      unit: ing.unit ?? parsed.unit,
     };
   });
 
@@ -337,8 +346,8 @@ async function createFromRecipes(req, res) {
     const itemPromises = consolidatedIngredients.map((item, index) => {
       return pool.query(
         `INSERT INTO shopping_list_items
-         (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
           shoppingList.id,
@@ -348,6 +357,7 @@ async function createFromRecipes(req, res) {
           item.category,
           index,
           item.recipe_id,
+          item.notes || null,
         ]
       );
     });
@@ -694,11 +704,14 @@ async function addRecipesToList(req, res) {
       if (mergedItems[key]) {
         // Check if units are compatible for summing
         if (areUnitsCompatible(mergedItems[key].unit, ing.unit)) {
-          // Update existing item quantity
-          if (ing.quantity !== null && mergedItems[key].quantity !== null) {
-            mergedItems[key].quantity += ing.quantity;
-          } else if (ing.quantity !== null) {
-            mergedItems[key].quantity = ing.quantity;
+          // Update existing item quantity - ensure numeric addition, not string concatenation
+          const existingQty = mergedItems[key].quantity !== null ? Number(mergedItems[key].quantity) : null;
+          const newQty = ing.quantity !== null ? Number(ing.quantity) : null;
+
+          if (newQty !== null && !isNaN(newQty) && existingQty !== null && !isNaN(existingQty)) {
+            mergedItems[key].quantity = existingQty + newQty;
+          } else if (newQty !== null && !isNaN(newQty)) {
+            mergedItems[key].quantity = newQty;
           }
           // Update notes if we have component breakdown
           if (ing.notes) {
@@ -753,10 +766,10 @@ async function addRecipesToList(req, res) {
         // Insert new item
         return pool.query(
           `INSERT INTO shopping_list_items
-           (shopping_list_id, ingredient_name, quantity, unit, category, recipe_id)
-           VALUES ($1, $2, $3, $4, $5, $6)
+           (shopping_list_id, ingredient_name, quantity, unit, category, recipe_id, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING *`,
-          [listId, item.ingredient_name, item.quantity, item.unit, item.category, item.recipe_id]
+          [listId, item.ingredient_name, item.quantity, item.unit, item.category, item.recipe_id, item.notes || null]
         );
       }
     });
@@ -882,16 +895,16 @@ async function removeRecipeFromList(req, res) {
           };
         });
 
-        // Re-aggregate with keepRecipeSeparate: true to maintain recipe provenance
-        const consolidatedIngredients = consolidateIngredients(scaledIngredients, { keepRecipeSeparate: true });
+        // Re-aggregate across all remaining recipes
+        const consolidatedIngredients = consolidateIngredients(scaledIngredients);
 
         // Insert the recomputed items
         for (let index = 0; index < consolidatedIngredients.length; index++) {
           const item = consolidatedIngredients[index];
           await client.query(
             `INSERT INTO shopping_list_items
-             (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+             (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id, notes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
             [
               shoppingListId,
               item.ingredient_name,
@@ -900,6 +913,7 @@ async function removeRecipeFromList(req, res) {
               item.category,
               index,
               item.recipe_id,
+              item.notes || null,
             ]
           );
         }
@@ -1031,16 +1045,16 @@ async function recomputeShoppingList(req, res) {
         };
       });
 
-      // Re-aggregate
-      const consolidatedIngredients = consolidateIngredients(scaledIngredients, { keepRecipeSeparate: true });
+      // Re-aggregate across all recipes
+      const consolidatedIngredients = consolidateIngredients(scaledIngredients);
 
       // Insert the recomputed items
       for (let index = 0; index < consolidatedIngredients.length; index++) {
         const item = consolidatedIngredients[index];
         await client.query(
           `INSERT INTO shopping_list_items
-           (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+           (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             shoppingListId,
             item.ingredient_name,
@@ -1049,6 +1063,7 @@ async function recomputeShoppingList(req, res) {
             item.category,
             index,
             item.recipe_id,
+            item.notes || null,
           ]
         );
       }

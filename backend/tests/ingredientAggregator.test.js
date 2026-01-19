@@ -15,6 +15,8 @@ const {
   aggregateIngredients,
   singularize,
   detectBellPepper,
+  stripModifiers,
+  matchIngredientFamily,
 } = require('../src/utils/ingredientAggregator');
 
 // ============================================
@@ -31,12 +33,14 @@ describe('normalizeIngredientName', () => {
 
     it('should collapse multiple spaces', () => {
       const result = normalizeIngredientName('garlic   cloves');
-      expect(result.canonicalKey).toBe('garlic clove');
+      // Now matches to garlic family
+      expect(result.canonicalKey).toBe('garlic');
     });
 
     it('should strip trailing punctuation', () => {
       const result = normalizeIngredientName('flour...');
-      expect(result.canonicalKey).toBe('flour');
+      // "flour" now maps to "all-purpose flour" by ingredient family
+      expect(result.canonicalKey).toBe('all-purpose flour');
     });
 
     it('should handle empty input', () => {
@@ -129,12 +133,14 @@ describe('normalizeIngredientName', () => {
 
     it('should NOT detect "black pepper" as bell pepper', () => {
       const result = normalizeIngredientName('black pepper');
+      // Now mapped via ingredient family
       expect(result.canonicalKey).toBe('black pepper');
       expect(result.attributes.isBellPepper).toBeUndefined();
     });
 
     it('should NOT detect "cayenne pepper" as bell pepper', () => {
       const result = normalizeIngredientName('cayenne pepper');
+      // Now mapped via ingredient family
       expect(result.canonicalKey).toBe('cayenne pepper');
       expect(result.attributes.isBellPepper).toBeUndefined();
     });
@@ -163,6 +169,125 @@ describe('normalizeIngredientName', () => {
     it('should not singularize already singular words', () => {
       const result = normalizeIngredientName('garlic');
       expect(result.canonicalKey).toBe('garlic');
+    });
+  });
+
+  describe('modifier stripping', () => {
+    it('should strip preparation modifiers like "shredded"', () => {
+      const result = stripModifiers('shredded cheddar cheese');
+      expect(result).toBe('cheddar cheese');
+    });
+
+    it('should strip quality modifiers like "extra sharp"', () => {
+      const result = stripModifiers('extra sharp cheddar');
+      expect(result).toBe('cheddar');
+    });
+
+    it('should strip "unsalted" from butter', () => {
+      const result = stripModifiers('unsalted butter');
+      expect(result).toBe('butter');
+    });
+
+    it('should strip multiple modifiers', () => {
+      const result = stripModifiers('freshly grated parmesan cheese');
+      expect(result).toBe('parmesan cheese');
+    });
+
+    it('should strip size modifiers', () => {
+      const result = stripModifiers('large eggs');
+      expect(result).toBe('eggs');
+    });
+
+    it('should strip "diced" and "chopped"', () => {
+      expect(stripModifiers('diced onion')).toBe('onion');
+      expect(stripModifiers('chopped garlic')).toBe('garlic');
+    });
+  });
+
+  describe('ingredient family matching', () => {
+    it('should match "cheddar" to "cheddar cheese"', () => {
+      const result = matchIngredientFamily('cheddar');
+      expect(result.canonical).toBe('cheddar cheese');
+    });
+
+    it('should match "sharp cheddar" to "cheddar cheese"', () => {
+      const result = matchIngredientFamily('sharp cheddar');
+      expect(result.canonical).toBe('cheddar cheese');
+    });
+
+    it('should match "unsalted butter" to "butter"', () => {
+      const result = matchIngredientFamily('unsalted butter');
+      expect(result.canonical).toBe('butter');
+    });
+
+    it('should match "garlic cloves" to "garlic"', () => {
+      const result = matchIngredientFamily('garlic cloves');
+      expect(result.canonical).toBe('garlic');
+    });
+
+    it('should match nutmeg variants', () => {
+      expect(matchIngredientFamily('nutmeg').canonical).toBe('nutmeg');
+      expect(matchIngredientFamily('ground nutmeg').canonical).toBe('nutmeg');
+      expect(matchIngredientFamily('freshly grated nutmeg').canonical).toBe('nutmeg');
+    });
+
+    it('should match olive oil variants', () => {
+      expect(matchIngredientFamily('olive oil').canonical).toBe('olive oil');
+      expect(matchIngredientFamily('extra virgin olive oil').canonical).toBe('olive oil');
+    });
+
+    it('should match flour variants', () => {
+      expect(matchIngredientFamily('flour').canonical).toBe('all-purpose flour');
+      expect(matchIngredientFamily('all-purpose flour').canonical).toBe('all-purpose flour');
+      expect(matchIngredientFamily('bread flour').canonical).toBe('bread flour');
+    });
+
+    it('should combine kosher salt and table salt into salt family', () => {
+      expect(matchIngredientFamily('kosher salt').canonical).toBe('salt');
+      expect(matchIngredientFamily('salt').canonical).toBe('salt');
+      expect(matchIngredientFamily('sea salt').canonical).toBe('salt');
+    });
+  });
+
+  describe('combined normalization (modifiers + families)', () => {
+    it('should normalize "shredded cheddar" to "cheddar cheese"', () => {
+      const result = normalizeIngredientName('shredded cheddar');
+      expect(result.canonicalKey).toBe('cheddar cheese');
+    });
+
+    it('should normalize "extra sharp cheddar cheese" to "cheddar cheese"', () => {
+      const result = normalizeIngredientName('extra sharp cheddar cheese');
+      expect(result.canonicalKey).toBe('cheddar cheese');
+    });
+
+    it('should normalize "unsalted butter" to "butter"', () => {
+      const result = normalizeIngredientName('unsalted butter');
+      expect(result.canonicalKey).toBe('butter');
+    });
+
+    it('should normalize "melted butter" to "butter"', () => {
+      const result = normalizeIngredientName('melted butter');
+      expect(result.canonicalKey).toBe('butter');
+    });
+
+    it('should normalize various milk types to "milk"', () => {
+      expect(normalizeIngredientName('whole milk').canonicalKey).toBe('milk');
+      expect(normalizeIngredientName('2% milk').canonicalKey).toBe('milk');
+      expect(normalizeIngredientName('skim milk').canonicalKey).toBe('milk');
+    });
+
+    it('should normalize various onion types to "onion"', () => {
+      expect(normalizeIngredientName('yellow onion').canonicalKey).toBe('onion');
+      expect(normalizeIngredientName('white onion').canonicalKey).toBe('onion');
+      expect(normalizeIngredientName('sweet onion').canonicalKey).toBe('onion');
+      // Red onion stays separate
+      expect(normalizeIngredientName('red onion').canonicalKey).toBe('red onion');
+    });
+
+    it('should normalize "minced garlic" and "garlic cloves" to "garlic"', () => {
+      expect(normalizeIngredientName('minced garlic').canonicalKey).toBe('garlic');
+      expect(normalizeIngredientName('garlic cloves').canonicalKey).toBe('garlic');
+      expect(normalizeIngredientName('cloves of garlic').canonicalKey).toBe('garlic');
     });
   });
 });
@@ -238,7 +363,8 @@ describe('aggregateIngredients', () => {
 
       const result = aggregateIngredients(lines);
       expect(result).toHaveLength(1);
-      expect(result[0].displayName).toBe('Flour');
+      // "flour" now maps to "All-purpose flour" via ingredient family
+      expect(result[0].displayName).toBe('All-purpose flour');
       expect(result[0].totalQuantity).toBe(5);
       expect(result[0].unit).toBe('cup');
       expect(result[0].sourceLines).toHaveLength(2);
@@ -416,7 +542,8 @@ describe('aggregateIngredients', () => {
       expect(result[0].sourceLines[0].parsed).toEqual({
         quantity: 2,
         unit: 'cup',
-        name: 'Flour',
+        // "flour" now maps to "All-purpose flour" via ingredient family
+        name: 'All-purpose flour',
       });
     });
   });

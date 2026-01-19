@@ -382,7 +382,8 @@ describe('Shopping List Integration: No Duplicate Rows', () => {
 
     const consolidated = consolidateIngredients(ingredients, { keepRecipeSeparate: true });
 
-    const flourItems = consolidated.filter((item) => item.canonical_key === 'flour');
+    // "flour" now normalizes to "all-purpose flour" via ingredient family mapping
+    const flourItems = consolidated.filter((item) => item.canonical_key === 'all-purpose flour');
     expect(flourItems.length).toBe(1); // Should be merged into one
     expect(flourItems[0].quantity).toBe(3); // 2 + 1
   });

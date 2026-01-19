@@ -115,25 +115,16 @@ export default function ShoppingItemsList({
                         />
                       </div>
                       <div className="flex-1 min-w-0">
+                        {/* Main line: quantity unit ingredient (e.g., "8 oz Cheddar cheese") */}
                         <div
                           className={`font-medium shopping-item ${
                             item.is_checked ? 'line-through text-gray-500' : 'text-gray-900'
                           }`}
                         >
-                          {item.ingredient_name}
+                          {item.quantity || item.unit
+                            ? `${formatQuantity(item.quantity, item.unit)} ${item.ingredient_name}`
+                            : item.ingredient_name}
                         </div>
-                        {/* Quantity display - handle null quantity with components */}
-                        {(item.quantity || item.unit || (item.components && item.components.length > 0)) && (
-                          <div
-                            className={`text-sm mt-0.5 ${
-                              item.is_checked ? 'text-gray-400' : 'text-gray-600'
-                            }`}
-                          >
-                            {item.quantity === null && item.components && item.components.length > 0
-                              ? 'See breakdown below'
-                              : formatQuantity(item.quantity, item.unit)}
-                          </div>
-                        )}
                         {/* Component breakdown for aggregated items (e.g., bell pepper colors) */}
                         {item.components && item.components.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 mt-1.5">
