@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { recipes, shoppingLists } from '../services/api';
+import { formatScaledIngredient } from '../core';
 import Layout from '../components/Layout';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Button from '../components/Button';
@@ -108,83 +109,28 @@ export default function RecipeDetailPage() {
     }
   };
 
-  // Format ingredient quantity for display
+  // Format ingredient for display using core module
+  // Returns either a string or JSX element (for scaled ingredients with original)
   const formatQuantity = (ingredient) => {
-    if (!ingredient.quantity) {
-      return ingredient.rawText;
-    }
+    const { display, scaled, originalDisplay } = formatScaledIngredient(ingredient, true);
 
-    const qty = ingredient.quantity;
-    let displayQty = String(qty);
-
-    // Convert decimals to fractions
-    const fractionMap = {
-      0.125: '⅛',
-      0.25: '¼',
-      0.333: '⅓',
-      0.375: '⅜',
-      0.5: '½',
-      0.625: '⅝',
-      0.666: '⅔',
-      0.75: '¾',
-      0.875: '⅞',
-    };
-
-    const whole = Math.floor(qty);
-    const fraction = qty - whole;
-
-    for (const [decimal, frac] of Object.entries(fractionMap)) {
-      if (Math.abs(fraction - parseFloat(decimal)) < 0.01) {
-        displayQty = whole > 0 ? `${whole} ${frac}` : frac;
-        break;
-      }
-    }
-
-    // If not converted to fraction, format decimal
-    if (displayQty === String(qty) && fraction > 0.01) {
-      displayQty = qty.toFixed(2);
-    } else if (fraction < 0.01) {
-      displayQty = String(whole);
-    }
-
-    const unit = ingredient.unit || '';
-    const name = ingredient.ingredientName || '';
-
-    // Show original if scaled
-    if (ingredient.originalQuantity && Math.abs(ingredient.originalQuantity - qty) > 0.01) {
-      const originalQty = ingredient.originalQuantity;
-      let originalDisplay = String(originalQty);
-
-      const originalWhole = Math.floor(originalQty);
-      const originalFraction = originalQty - originalWhole;
-
-      for (const [decimal, frac] of Object.entries(fractionMap)) {
-        if (Math.abs(originalFraction - parseFloat(decimal)) < 0.01) {
-          originalDisplay = originalWhole > 0 ? `${originalWhole} ${frac}` : frac;
-          break;
-        }
-      }
-
-      if (originalDisplay === String(originalQty) && originalFraction > 0.01) {
-        originalDisplay = originalQty.toFixed(2);
-      } else if (originalFraction < 0.01) {
-        originalDisplay = String(originalWhole);
-      }
+    if (scaled && originalDisplay) {
+      // Get the parts for styled display
+      const name = ingredient.ingredientName || ingredient.ingredient || '';
+      const capitalizedName = name ? name.charAt(0).toUpperCase() + name.slice(1) : '';
 
       return (
         <span>
           <span className="font-semibold text-primary-700">
-            {displayQty} {unit}
+            {originalDisplay ? display.replace(capitalizedName, '').trim() : display}
           </span>{' '}
-          {name}
-          <span className="text-xs text-gray-500 ml-2">
-            (originally {originalDisplay} {unit})
-          </span>
+          {capitalizedName}
+          <span className="text-xs text-gray-500 ml-2">(originally {originalDisplay})</span>
         </span>
       );
     }
 
-    return `${displayQty} ${unit} ${name}`.trim();
+    return display;
   };
 
   const handleDelete = async () => {
@@ -294,35 +240,40 @@ export default function RecipeDetailPage() {
         )}
 
         {/* Title and Actions */}
-        <div className="flex justify-between items-start mb-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-6">
           <div>
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">{recipe.title}</h1>
-            {recipe.description && <p className="text-gray-600 text-lg">{recipe.description}</p>}
+            <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2">{recipe.title}</h1>
+            {recipe.description && (
+              <p className="text-gray-600 text-base sm:text-lg">{recipe.description}</p>
+            )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 no-print">
             <Button
               onClick={handlePrint}
               variant="outline"
-              className="flex items-center gap-2 no-print"
+              className="flex items-center gap-2 min-h-[44px]"
             >
               <PrinterIcon className="w-5 h-5" />
-              Print
+              <span className="hidden sm:inline">Print</span>
             </Button>
             <Button
               onClick={handleAddToShoppingList}
               loading={creatingList}
-              className="flex items-center gap-2 no-print"
+              className="flex items-center gap-2 min-h-[44px]"
             >
               <ShoppingCartIcon className="w-5 h-5" />
-              {recipe.isScaled
-                ? `Add to List (${currentServings} servings)`
-                : 'Add to Shopping List'}
+              <span className="hidden sm:inline">
+                {recipe.isScaled
+                  ? `Add to List (${currentServings} servings)`
+                  : 'Add to Shopping List'}
+              </span>
+              <span className="sm:hidden">Add to List</span>
             </Button>
             <Button
               variant="secondary"
               onClick={handleDelete}
               loading={deleting}
-              className="no-print"
+              className="min-h-[44px]"
             >
               Delete
             </Button>

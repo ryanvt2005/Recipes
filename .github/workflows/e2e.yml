@@ -1,0 +1,134 @@
+name: E2E Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  e2e-tests:
+    name: Playwright E2E Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: recipeapp
+          POSTGRES_USER: recipeuser
+          POSTGRES_PASSWORD: testpassword
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      - name: Install root dependencies (Playwright)
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --prefer-offline
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --prefer-offline
+
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_URL: http://localhost:3000
+        run: npm run build
+
+      - name: Run database migrations
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: recipeapp
+          DB_USER: recipeuser
+          DB_PASSWORD: testpassword
+          JWT_SECRET: e2e-test-secret-key
+          NODE_ENV: test
+        run: npm run migrate
+
+      - name: Start backend server
+        working-directory: backend
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: recipeapp
+          DB_USER: recipeuser
+          DB_PASSWORD: testpassword
+          JWT_SECRET: e2e-test-secret-key
+          NODE_ENV: production
+          PORT: 3000
+          FRONTEND_URL: http://localhost:3001
+        run: |
+          npm start &
+          echo "Waiting for backend to start..."
+          for i in {1..30}; do
+            if curl -s http://localhost:3000/health > /dev/null; then
+              echo "Backend is ready!"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Start frontend server
+        working-directory: frontend
+        run: |
+          npx serve -s dist -l 3001 &
+          echo "Waiting for frontend to start..."
+          for i in {1..15}; do
+            if curl -s http://localhost:3001 > /dev/null; then
+              echo "Frontend is ready!"
+              break
+            fi
+            sleep 2
+          done
+
+      - name: Run Playwright tests
+        env:
+          BASE_URL: http://localhost:3001
+          CI: true
+        run: npx playwright test --project=chromium
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload test screenshots
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-screenshots
+          path: test-results/
+          retention-days: 7

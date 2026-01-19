@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect } from 'react';
-import { auth } from '../services/api';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { authApi, setUnauthorizedHandler } from '../api';
 
 const AuthContext = createContext(null);
 
@@ -15,7 +15,18 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Logout function - clears state and storage
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+  }, []);
+
   useEffect(() => {
+    // Register the logout handler with the HTTP client
+    // This will be called on 401/403 responses
+    setUnauthorizedHandler(logout);
+
     // Check if user is logged in
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
@@ -30,10 +41,10 @@ export const AuthProvider = ({ children }) => {
       }
     }
     setLoading(false);
-  }, []);
+  }, [logout]);
 
   const login = async (email, password) => {
-    const response = await auth.login({ email, password });
+    const response = await authApi.login({ email, password });
     const { user: userData, token } = response.data;
 
     localStorage.setItem('token', token);
@@ -44,7 +55,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const register = async (email, password, firstName, lastName) => {
-    const response = await auth.register({ email, password, firstName, lastName });
+    const response = await authApi.register({ email, password, firstName, lastName });
     const { user: userData, token } = response.data;
 
     localStorage.setItem('token', token);
@@ -52,12 +63,6 @@ export const AuthProvider = ({ children }) => {
     setUser(userData);
 
     return userData;
-  };
-
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
   };
 
   const value = {

@@ -4,6 +4,7 @@ const cheerio = require('cheerio');
 const crypto = require('crypto');
 const pool = require('../config/database');
 const logger = require('../config/logger');
+const { parseIngredientString: parseIngredient } = require('../utils/ingredientParser');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -280,52 +281,11 @@ function parseSchemaInstructions(instructions) {
 }
 
 /**
- * Basic ingredient string parsing
+ * Parse ingredient string using the new robust parser
+ * This wrapper maintains the same interface for backward compatibility
  */
 function parseIngredientString(rawText, sortOrder = 0) {
-  // This is a simplified parser - in production, consider using an LLM or specialized library
-  const pattern = /^(\d+\/\d+|\d+\.?\d*)\s*([a-zA-Z]+)?\s+(.+?)(?:,\s*(.+))?$/i;
-  const match = rawText.match(pattern);
-
-  if (match) {
-    return {
-      rawText,
-      sortOrder,
-      quantity: parseQuantity(match[1]),
-      unit: match[2] || null,
-      ingredient: match[3].trim(),
-      preparation: match[4] || null,
-      group: null,
-    };
-  }
-
-  // Fallback: just store the raw text
-  return {
-    rawText,
-    sortOrder,
-    quantity: null,
-    unit: null,
-    ingredient: rawText,
-    preparation: null,
-    group: null,
-  };
-}
-
-/**
- * Parse quantity (handles fractions)
- */
-function parseQuantity(quantityStr) {
-  if (!quantityStr) {
-    return null;
-  }
-
-  // Handle fractions like "1/2"
-  if (quantityStr.includes('/')) {
-    const [numerator, denominator] = quantityStr.split('/').map(Number);
-    return numerator / denominator;
-  }
-
-  return parseFloat(quantityStr);
+  return parseIngredient(rawText, sortOrder);
 }
 
 /**

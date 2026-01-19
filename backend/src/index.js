@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const logger = require('./config/logger');
+const { ErrorCodes } = require('./utils/errorResponse');
 const authRoutes = require('./routes/authRoutes');
 const recipeRoutes = require('./routes/recipeRoutes');
 const shoppingListRoutes = require('./routes/shoppingListRoutes');
@@ -35,6 +36,8 @@ app.use(
       }
     },
     credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    exposedHeaders: ['Content-Length', 'X-Request-Id'],
   })
 );
 
@@ -81,18 +84,20 @@ app.use((err, req, res, _next) => {
   });
 
   res.status(err.status || 500).json({
-    error: 'INTERNAL_SERVER_ERROR',
+    error: err.code || ErrorCodes.INTERNAL_ERROR,
     message:
       process.env.NODE_ENV === 'production' ? 'An internal server error occurred' : err.message,
   });
 });
 
-// Start server
-app.listen(PORT, () => {
-  logger.info(`Server started on port ${PORT}`);
-  logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
-  logger.info(`Health check: http://localhost:${PORT}/health`);
-});
+// Start server (only if not in test mode)
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    logger.info(`Server started on port ${PORT}`);
+    logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`Health check: http://localhost:${PORT}/health`);
+  });
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

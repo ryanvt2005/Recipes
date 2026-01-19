@@ -1,6 +1,8 @@
 const pool = require('../config/database');
 const logger = require('../config/logger');
 const { categorizeIngredient } = require('../utils/ingredientCategorizer');
+const { ErrorCodes, sendError, errors } = require('../utils/errorResponse');
+const { aggregateIngredients, normalizeIngredientName, areUnitsCompatible } = require('../utils/ingredientAggregator');
 
 /**
  * Parse quantity from ingredient text
@@ -170,37 +172,87 @@ function parseIngredient(rawText, ingredientName) {
 }
 
 /**
- * Consolidate ingredients from multiple recipes
- * Combines ingredients with the same name and unit
+ * Consolidate ingredients from multiple recipes using the v2 aggregation engine
+ * Combines ingredients with the same canonical name, handles bell pepper variants,
+ * normalizes "salt and pepper" style compounds, and sums compatible units
+ *
+ * @param {Array} recipeIngredients - Raw ingredients from database
+ * @param {Object} options - Aggregation options
+ * @param {boolean} options.keepRecipeSeparate - If true, don't merge across recipes (default: false to enable cross-recipe aggregation)
+ * @returns {Array} Consolidated ingredient items ready for database insertion
  */
-function consolidateIngredients(recipeIngredients) {
-  const consolidated = {};
+function consolidateIngredients(recipeIngredients, options = {}) {
+  const { keepRecipeSeparate = false } = options;
 
-  recipeIngredients.forEach((ing) => {
+  // Transform database format to aggregator input format
+  const lines = recipeIngredients.map((ing) => {
     const parsed = parseIngredient(ing.raw_text, ing.ingredient_name);
-
-    // Create a key based on ingredient name, unit, AND recipe_id to keep items from different recipes separate
-    const key = `${parsed.name}|${parsed.unit || 'none'}|${ing.recipe_id || 'unknown'}`;
-
-    if (consolidated[key]) {
-      // Add quantities if both exist
-      if (parsed.quantity !== null && consolidated[key].quantity !== null) {
-        consolidated[key].quantity += parsed.quantity;
-      } else if (parsed.quantity !== null) {
-        consolidated[key].quantity = parsed.quantity;
-      }
-    } else {
-      consolidated[key] = {
-        ingredient_name: parsed.name,
-        quantity: parsed.quantity,
-        unit: parsed.unit,
-        category: categorizeIngredient(parsed.name),
-        recipe_id: ing.recipe_id, // Preserve recipe_id
-      };
+    // Prefer database quantity/unit over parsed values (database has the authoritative data)
+    // Only use parsed values as fallback if database values are missing
+    // Ensure quantity is a number, not a string (PostgreSQL numeric can return as string)
+    let quantity = ing.quantity ?? parsed.quantity;
+    if (quantity !== null && quantity !== undefined) {
+      quantity = typeof quantity === 'string' ? parseFloat(quantity) : Number(quantity);
+      if (isNaN(quantity)) quantity = null;
     }
+
+    return {
+      recipeId: ing.recipe_id,
+      originalText: ing.raw_text,
+      name: parsed.name || ing.ingredient_name,
+      quantity,
+      unit: ing.unit ?? parsed.unit,
+    };
   });
 
-  return Object.values(consolidated);
+  if (keepRecipeSeparate) {
+    // For initial creation: keep items from different recipes separate
+    // Group by recipe first, then aggregate within each recipe
+    const byRecipe = new Map();
+    lines.forEach((line) => {
+      const recipeId = line.recipeId || 'unknown';
+      if (!byRecipe.has(recipeId)) {
+        byRecipe.set(recipeId, []);
+      }
+      byRecipe.get(recipeId).push(line);
+    });
+
+    const results = [];
+    for (const [recipeId, recipeLines] of byRecipe) {
+      const aggregated = aggregateIngredients(recipeLines);
+      aggregated.forEach((item) => {
+        results.push({
+          ingredient_name: item.displayName.toLowerCase(),
+          display_name: item.displayName,
+          canonical_key: item.canonicalKey,
+          quantity: item.totalQuantity,
+          unit: item.unit,
+          category: categorizeIngredient(item.canonicalKey),
+          recipe_id: recipeId,
+          components: item.components,
+          notes: item.notes,
+          source_lines: item.sourceLines,
+        });
+      });
+    }
+    return results;
+  }
+
+  // For merging: aggregate across all recipes
+  const aggregated = aggregateIngredients(lines);
+
+  return aggregated.map((item) => ({
+    ingredient_name: item.displayName.toLowerCase(),
+    display_name: item.displayName,
+    canonical_key: item.canonicalKey,
+    quantity: item.totalQuantity,
+    unit: item.unit,
+    category: categorizeIngredient(item.canonicalKey),
+    recipe_id: null, // Merged across recipes
+    components: item.components,
+    notes: item.notes,
+    source_lines: item.sourceLines,
+  }));
 }
 
 /**
@@ -215,11 +267,11 @@ async function createFromRecipes(req, res) {
   try {
     // Validate input
     if (!recipeIds || !Array.isArray(recipeIds) || recipeIds.length === 0) {
-      return res.status(400).json({ error: 'recipeIds array is required' });
+      return errors.badRequest(res, 'recipeIds array is required');
     }
 
     if (!name || name.trim() === '') {
-      return res.status(400).json({ error: 'Shopping list name is required' });
+      return errors.badRequest(res, 'Shopping list name is required');
     }
 
     // Parse recipeIds - support both string array and object array
@@ -243,7 +295,7 @@ async function createFromRecipes(req, res) {
     );
 
     if (ingredientsResult.rows.length === 0) {
-      return res.status(404).json({ error: 'No ingredients found for selected recipes' });
+      return errors.notFound(res, 'No ingredients found for selected recipes');
     }
 
     // Filter out excluded ingredients
@@ -294,8 +346,8 @@ async function createFromRecipes(req, res) {
     const itemPromises = consolidatedIngredients.map((item, index) => {
       return pool.query(
         `INSERT INTO shopping_list_items
-         (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
           shoppingList.id,
@@ -305,6 +357,7 @@ async function createFromRecipes(req, res) {
           item.category,
           index,
           item.recipe_id,
+          item.notes || null,
         ]
       );
     });
@@ -351,7 +404,7 @@ async function createFromRecipes(req, res) {
       userId,
       recipeIds,
     });
-    res.status(500).json({ error: 'Failed to create shopping list' });
+    return errors.internal(res, 'Failed to create shopping list');
   }
 }
 
@@ -375,7 +428,7 @@ async function getUserShoppingLists(req, res) {
     res.json({ shoppingLists: result.rows });
   } catch (error) {
     logger.error('Error fetching shopping lists', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch shopping lists' });
+    return errors.internal(res, 'Failed to fetch shopping lists');
   }
 }
 
@@ -394,7 +447,7 @@ async function getShoppingList(req, res) {
     );
 
     if (listResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Shopping list not found' });
+      return errors.notFound(res, 'Shopping list not found');
     }
 
     // Get items
@@ -422,7 +475,7 @@ async function getShoppingList(req, res) {
     });
   } catch (error) {
     logger.error('Error fetching shopping list', { error: error.message });
-    res.status(500).json({ error: 'Failed to fetch shopping list' });
+    return errors.internal(res, 'Failed to fetch shopping list');
   }
 }
 
@@ -444,7 +497,7 @@ async function updateItem(req, res) {
     );
 
     if (verifyResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Shopping list item not found' });
+      return errors.notFound(res, 'Shopping list item not found');
     }
 
     const item = verifyResult.rows[0];
@@ -479,7 +532,7 @@ async function updateItem(req, res) {
     res.json({ item: result.rows[0] });
   } catch (error) {
     logger.error('Error updating shopping list item', { error: error.message });
-    res.status(500).json({ error: 'Failed to update item' });
+    return errors.internal(res, 'Failed to update item');
   }
 }
 
@@ -497,14 +550,14 @@ async function deleteShoppingList(req, res) {
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Shopping list not found' });
+      return errors.notFound(res, 'Shopping list not found');
     }
 
     logger.info('Shopping list deleted', { userId, listId: id });
     res.json({ message: 'Shopping list deleted successfully' });
   } catch (error) {
     logger.error('Error deleting shopping list', { error: error.message });
-    res.status(500).json({ error: 'Failed to delete shopping list' });
+    return errors.internal(res, 'Failed to delete shopping list');
   }
 }
 
@@ -520,7 +573,7 @@ async function addRecipesToList(req, res) {
   try {
     // Validate input
     if (!recipeIds || !Array.isArray(recipeIds) || recipeIds.length === 0) {
-      return res.status(400).json({ error: 'recipeIds array is required' });
+      return errors.badRequest(res, 'recipeIds array is required');
     }
 
     // Verify shopping list exists and belongs to user
@@ -530,7 +583,7 @@ async function addRecipesToList(req, res) {
     );
 
     if (listResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Shopping list not found' });
+      return errors.notFound(res, 'Shopping list not found');
     }
 
     // Parse recipeIds - support both string array and object array
@@ -562,15 +615,11 @@ async function addRecipesToList(req, res) {
       const recipeNames = recipeNamesResult.rows.map((r) => r.title);
 
       if (duplicateRecipeIds.length === 1) {
-        return res.status(400).json({
-          error: 'Recipe already in shopping list',
-          message: `"${recipeNames[0]}" is already in this shopping list`,
+        return sendError(res, 400, ErrorCodes.DUPLICATE_RECIPE, `"${recipeNames[0]}" is already in this shopping list`, {
           duplicateRecipes: recipeNames,
         });
       } else {
-        return res.status(400).json({
-          error: 'Recipes already in shopping list',
-          message: `${duplicateRecipeIds.length} recipe(s) are already in this shopping list: ${recipeNames.join(', ')}`,
+        return sendError(res, 400, ErrorCodes.DUPLICATE_RECIPE, `${duplicateRecipeIds.length} recipe(s) are already in this shopping list: ${recipeNames.join(', ')}`, {
           duplicateRecipes: recipeNames,
         });
       }
@@ -587,7 +636,7 @@ async function addRecipesToList(req, res) {
     );
 
     if (ingredientsResult.rows.length === 0) {
-      return res.status(404).json({ error: 'No ingredients found for selected recipes' });
+      return errors.notFound(res, 'No ingredients found for selected recipes');
     }
 
     // Filter out excluded ingredients
@@ -625,17 +674,21 @@ async function addRecipesToList(req, res) {
     );
 
     const existingItems = existingItemsResult.rows;
-    const newIngredients = consolidateIngredients(scaledIngredients);
+    // Use aggregation engine without recipe separation for merging
+    const newIngredients = consolidateIngredients(scaledIngredients, { keepRecipeSeparate: false });
 
-    // Merge with existing items
+    // Merge with existing items using canonical keys for matching
     const mergedItems = {};
 
-    // Add existing items to merged
+    // Add existing items to merged - normalize their names for matching
     existingItems.forEach((item) => {
-      const key = `${item.ingredient_name}|${item.unit || 'none'}`;
+      const { canonicalKey } = normalizeIngredientName(item.ingredient_name);
+      const key = `${canonicalKey}|${item.unit || 'none'}`;
       mergedItems[key] = {
         id: item.id,
         ingredient_name: item.ingredient_name,
+        display_name: item.display_name || item.ingredient_name,
+        canonical_key: canonicalKey,
         quantity: item.quantity,
         unit: item.unit,
         category: item.category,
@@ -643,25 +696,56 @@ async function addRecipesToList(req, res) {
       };
     });
 
-    // Add or merge new ingredients
+    // Add or merge new ingredients using canonical keys
     newIngredients.forEach((ing) => {
-      const key = `${ing.ingredient_name}|${ing.unit || 'none'}`;
+      const canonicalKey = ing.canonical_key;
+      const key = `${canonicalKey}|${ing.unit || 'none'}`;
 
       if (mergedItems[key]) {
-        // Update existing item quantity
-        if (ing.quantity !== null && mergedItems[key].quantity !== null) {
-          mergedItems[key].quantity += ing.quantity;
-        } else if (ing.quantity !== null) {
-          mergedItems[key].quantity = ing.quantity;
+        // Check if units are compatible for summing
+        if (areUnitsCompatible(mergedItems[key].unit, ing.unit)) {
+          // Update existing item quantity - ensure numeric addition, not string concatenation
+          const existingQty = mergedItems[key].quantity !== null ? Number(mergedItems[key].quantity) : null;
+          const newQty = ing.quantity !== null ? Number(ing.quantity) : null;
+
+          if (newQty !== null && !isNaN(newQty) && existingQty !== null && !isNaN(existingQty)) {
+            mergedItems[key].quantity = existingQty + newQty;
+          } else if (newQty !== null && !isNaN(newQty)) {
+            mergedItems[key].quantity = newQty;
+          }
+          // Update notes if we have component breakdown
+          if (ing.notes) {
+            mergedItems[key].notes = ing.notes;
+          }
+          if (ing.components) {
+            mergedItems[key].components = ing.components;
+          }
+        } else {
+          // Units not compatible - add as separate item with different key
+          const altKey = `${canonicalKey}|${ing.unit || 'none'}|new`;
+          mergedItems[altKey] = {
+            ingredient_name: ing.ingredient_name,
+            display_name: ing.display_name,
+            canonical_key: canonicalKey,
+            quantity: ing.quantity,
+            unit: ing.unit,
+            category: ing.category || categorizeIngredient(canonicalKey),
+            components: ing.components,
+            notes: ing.notes,
+            existing: false,
+          };
         }
       } else {
         // Add new item
         mergedItems[key] = {
           ingredient_name: ing.ingredient_name,
+          display_name: ing.display_name,
+          canonical_key: canonicalKey,
           quantity: ing.quantity,
           unit: ing.unit,
-          category: ing.category || categorizeIngredient(ing.ingredient_name),
-          recipe_id: ing.recipe_id, // Track which recipe this ingredient came from
+          category: ing.category || categorizeIngredient(canonicalKey),
+          components: ing.components,
+          notes: ing.notes,
           existing: false,
         };
       }
@@ -682,10 +766,10 @@ async function addRecipesToList(req, res) {
         // Insert new item
         return pool.query(
           `INSERT INTO shopping_list_items
-           (shopping_list_id, ingredient_name, quantity, unit, category, recipe_id)
-           VALUES ($1, $2, $3, $4, $5, $6)
+           (shopping_list_id, ingredient_name, quantity, unit, category, recipe_id, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING *`,
-          [listId, item.ingredient_name, item.quantity, item.unit, item.category, item.recipe_id]
+          [listId, item.ingredient_name, item.quantity, item.unit, item.category, item.recipe_id, item.notes || null]
         );
       }
     });
@@ -726,13 +810,13 @@ async function addRecipesToList(req, res) {
     });
   } catch (error) {
     logger.error('Error adding recipes to shopping list', { error: error.message });
-    res.status(500).json({ error: 'Failed to add recipes to shopping list' });
+    return errors.internal(res, 'Failed to add recipes to shopping list');
   }
 }
 
 /**
  * Remove a recipe from a shopping list
- * Deletes all items associated with that recipe
+ * Recomputes the shopping list by re-aggregating remaining recipes
  */
 async function removeRecipeFromList(req, res) {
   const client = await pool.connect();
@@ -751,29 +835,272 @@ async function removeRecipeFromList(req, res) {
 
     if (listCheck.rows.length === 0) {
       await client.query('ROLLBACK');
-      return res.status(404).json({ error: 'Shopping list not found' });
+      return errors.notFound(res, 'Shopping list not found');
     }
 
-    // Delete all items from this recipe
-    await client.query(
-      'DELETE FROM shopping_list_items WHERE shopping_list_id = $1 AND recipe_id = $2',
+    // Get remaining recipes after removing this one
+    const remainingRecipesResult = await client.query(
+      `SELECT recipe_id, scaled_servings FROM shopping_list_recipes
+       WHERE shopping_list_id = $1 AND recipe_id != $2`,
       [shoppingListId, recipeId]
     );
 
-    // Remove from shopping_list_recipes join table
+    const remainingRecipes = remainingRecipesResult.rows;
+
+    // Delete all current items from the shopping list
+    await client.query(
+      'DELETE FROM shopping_list_items WHERE shopping_list_id = $1',
+      [shoppingListId]
+    );
+
+    // Remove the recipe from shopping_list_recipes join table
     await client.query(
       'DELETE FROM shopping_list_recipes WHERE shopping_list_id = $1 AND recipe_id = $2',
       [shoppingListId, recipeId]
     );
 
+    // If there are remaining recipes, recompute the shopping list
+    if (remainingRecipes.length > 0) {
+      const recipeIds = remainingRecipes.map((r) => r.recipe_id);
+
+      // Get ingredients from remaining recipes
+      const ingredientsResult = await client.query(
+        `SELECT i.raw_text, i.quantity, i.unit, i.ingredient_name, i.recipe_id, r.servings as recipe_servings
+         FROM ingredients i
+         INNER JOIN recipes r ON i.recipe_id = r.id
+         WHERE r.id = ANY($1) AND r.user_id = $2
+         ORDER BY i.sort_order`,
+        [recipeIds, userId]
+      );
+
+      if (ingredientsResult.rows.length > 0) {
+        // Scale ingredients if needed
+        const { parseServings } = require('../utils/recipeScaling');
+        const scaledIngredients = ingredientsResult.rows.map((ingredient) => {
+          const recipeInfo = remainingRecipes.find((r) => r.recipe_id === ingredient.recipe_id);
+
+          if (!recipeInfo || !recipeInfo.scaled_servings) {
+            return ingredient;
+          }
+
+          const originalServings = parseServings(ingredient.recipe_servings);
+          if (!originalServings) {
+            return ingredient;
+          }
+
+          const scaleFactor = recipeInfo.scaled_servings / originalServings;
+          return {
+            ...ingredient,
+            quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity,
+          };
+        });
+
+        // Re-aggregate across all remaining recipes
+        const consolidatedIngredients = consolidateIngredients(scaledIngredients);
+
+        // Insert the recomputed items
+        for (let index = 0; index < consolidatedIngredients.length; index++) {
+          const item = consolidatedIngredients[index];
+          await client.query(
+            `INSERT INTO shopping_list_items
+             (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id, notes)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            [
+              shoppingListId,
+              item.ingredient_name,
+              item.quantity,
+              item.unit,
+              item.category,
+              index,
+              item.recipe_id,
+              item.notes || null,
+            ]
+          );
+        }
+      }
+    }
+
     await client.query('COMMIT');
 
-    logger.info(`Removed recipe ${recipeId} from shopping list ${shoppingListId}`);
-    res.json({ message: 'Recipe removed from shopping list' });
+    // Get the updated items to return
+    const updatedItemsResult = await pool.query(
+      `SELECT * FROM shopping_list_items
+       WHERE shopping_list_id = $1
+       ORDER BY sort_order, ingredient_name`,
+      [shoppingListId]
+    );
+
+    // Get remaining associated recipes
+    const recipesResult = await pool.query(
+      `SELECT r.id, r.title, r.image_url, slr.scaled_servings, slr.added_at
+       FROM shopping_list_recipes slr
+       INNER JOIN recipes r ON slr.recipe_id = r.id
+       WHERE slr.shopping_list_id = $1
+       ORDER BY slr.added_at`,
+      [shoppingListId]
+    );
+
+    logger.info(`Removed recipe ${recipeId} from shopping list ${shoppingListId}, recomputed with ${remainingRecipes.length} remaining recipes`);
+
+    res.json({
+      message: 'Recipe removed from shopping list',
+      items: updatedItemsResult.rows,
+      recipes: recipesResult.rows,
+    });
   } catch (error) {
     await client.query('ROLLBACK');
     logger.error('Error removing recipe from shopping list:', error);
-    res.status(500).json({ error: 'Failed to remove recipe from shopping list' });
+    return errors.internal(res, 'Failed to remove recipe from shopping list');
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Recompute a shopping list from its associated recipes
+ * Useful for refreshing a list after recipe changes or applying new aggregation rules
+ */
+async function recomputeShoppingList(req, res) {
+  const client = await pool.connect();
+
+  try {
+    const { id: shoppingListId } = req.params;
+    const userId = req.user.userId;
+
+    await client.query('BEGIN');
+
+    // Verify shopping list belongs to user
+    const listCheck = await client.query(
+      'SELECT * FROM shopping_lists WHERE id = $1 AND user_id = $2',
+      [shoppingListId, userId]
+    );
+
+    if (listCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return errors.notFound(res, 'Shopping list not found');
+    }
+
+    // Get all associated recipes
+    const recipesResult = await client.query(
+      `SELECT recipe_id, scaled_servings FROM shopping_list_recipes
+       WHERE shopping_list_id = $1`,
+      [shoppingListId]
+    );
+
+    const recipes = recipesResult.rows;
+
+    if (recipes.length === 0) {
+      // No recipes - just clear items
+      await client.query(
+        'DELETE FROM shopping_list_items WHERE shopping_list_id = $1',
+        [shoppingListId]
+      );
+
+      await client.query('COMMIT');
+
+      return res.json({
+        message: 'Shopping list recomputed (no recipes)',
+        items: [],
+        recipes: [],
+      });
+    }
+
+    const recipeIds = recipes.map((r) => r.recipe_id);
+
+    // Get ingredients from all recipes
+    const ingredientsResult = await client.query(
+      `SELECT i.raw_text, i.quantity, i.unit, i.ingredient_name, i.recipe_id, r.servings as recipe_servings
+       FROM ingredients i
+       INNER JOIN recipes r ON i.recipe_id = r.id
+       WHERE r.id = ANY($1) AND r.user_id = $2
+       ORDER BY i.sort_order`,
+      [recipeIds, userId]
+    );
+
+    // Delete all current items
+    await client.query(
+      'DELETE FROM shopping_list_items WHERE shopping_list_id = $1',
+      [shoppingListId]
+    );
+
+    if (ingredientsResult.rows.length > 0) {
+      // Scale ingredients if needed
+      const { parseServings } = require('../utils/recipeScaling');
+      const scaledIngredients = ingredientsResult.rows.map((ingredient) => {
+        const recipeInfo = recipes.find((r) => r.recipe_id === ingredient.recipe_id);
+
+        if (!recipeInfo || !recipeInfo.scaled_servings) {
+          return ingredient;
+        }
+
+        const originalServings = parseServings(ingredient.recipe_servings);
+        if (!originalServings) {
+          return ingredient;
+        }
+
+        const scaleFactor = recipeInfo.scaled_servings / originalServings;
+        return {
+          ...ingredient,
+          quantity: ingredient.quantity ? ingredient.quantity * scaleFactor : ingredient.quantity,
+        };
+      });
+
+      // Re-aggregate across all recipes
+      const consolidatedIngredients = consolidateIngredients(scaledIngredients);
+
+      // Insert the recomputed items
+      for (let index = 0; index < consolidatedIngredients.length; index++) {
+        const item = consolidatedIngredients[index];
+        await client.query(
+          `INSERT INTO shopping_list_items
+           (shopping_list_id, ingredient_name, quantity, unit, category, sort_order, recipe_id, notes)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            shoppingListId,
+            item.ingredient_name,
+            item.quantity,
+            item.unit,
+            item.category,
+            index,
+            item.recipe_id,
+            item.notes || null,
+          ]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+
+    // Get the updated items
+    const updatedItemsResult = await pool.query(
+      `SELECT * FROM shopping_list_items
+       WHERE shopping_list_id = $1
+       ORDER BY sort_order, ingredient_name`,
+      [shoppingListId]
+    );
+
+    // Get associated recipes with details
+    const recipeDetailsResult = await pool.query(
+      `SELECT r.id, r.title, r.image_url, slr.scaled_servings, slr.added_at
+       FROM shopping_list_recipes slr
+       INNER JOIN recipes r ON slr.recipe_id = r.id
+       WHERE slr.shopping_list_id = $1
+       ORDER BY slr.added_at`,
+      [shoppingListId]
+    );
+
+    logger.info(`Recomputed shopping list ${shoppingListId} with ${recipes.length} recipes`);
+
+    res.json({
+      message: `Shopping list recomputed with ${updatedItemsResult.rows.length} items`,
+      shoppingList: listCheck.rows[0],
+      items: updatedItemsResult.rows,
+      recipes: recipeDetailsResult.rows,
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('Error recomputing shopping list:', error);
+    return errors.internal(res, 'Failed to recompute shopping list');
   } finally {
     client.release();
   }
@@ -787,4 +1114,5 @@ module.exports = {
   deleteShoppingList,
   addRecipesToList,
   removeRecipeFromList,
+  recomputeShoppingList,
 };

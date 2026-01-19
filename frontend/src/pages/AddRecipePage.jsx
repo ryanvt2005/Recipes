@@ -241,7 +241,7 @@ export default function AddRecipePage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <Input
                     label="Prep Time"
                     value={extractedRecipe.prepTime || ''}
@@ -264,6 +264,7 @@ export default function AddRecipePage() {
 
                 <Input
                   label="Image URL"
+                  type="url"
                   value={extractedRecipe.imageUrl || ''}
                   onChange={(e) => handleFieldChange('imageUrl', e.target.value)}
                   placeholder="https://example.com/image.jpg"
@@ -281,18 +282,19 @@ export default function AddRecipePage() {
               </div>
               <div className="space-y-3">
                 {extractedRecipe.ingredients.map((ingredient, index) => (
-                  <div key={index} className="flex gap-2">
+                  <div key={index} className="flex gap-2 items-start">
                     <Input
                       value={ingredient.rawText || ingredient.ingredient}
                       onChange={(e) => handleIngredientChange(index, 'rawText', e.target.value)}
                       placeholder="e.g., 2 cups flour"
-                      className="flex-1"
+                      className="flex-1 !mb-0"
                     />
                     {extractedRecipe.ingredients.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeIngredient(index)}
-                        className="text-red-600 hover:text-red-800 px-2"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                        aria-label="Remove ingredient"
                       >
                         ✕
                       </button>
@@ -312,20 +314,23 @@ export default function AddRecipePage() {
               </div>
               <div className="space-y-3">
                 {extractedRecipe.instructions.map((instruction, index) => (
-                  <div key={index} className="flex gap-2">
-                    <span className="text-gray-500 font-medium mt-2">{index + 1}.</span>
+                  <div key={index} className="flex gap-2 items-start">
+                    <span className="text-gray-500 font-medium min-w-[24px] pt-3">
+                      {index + 1}.
+                    </span>
                     <textarea
                       value={instruction}
                       onChange={(e) => handleInstructionChange(index, e.target.value)}
                       rows={2}
-                      className="input flex-1"
+                      className="input flex-1 min-h-[44px]"
                       placeholder={`Step ${index + 1}`}
                     />
                     {extractedRecipe.instructions.length > 1 && (
                       <button
                         type="button"
                         onClick={() => removeInstruction(index)}
-                        className="text-red-600 hover:text-red-800 px-2"
+                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                        aria-label="Remove step"
                       >
                         ✕
                       </button>
