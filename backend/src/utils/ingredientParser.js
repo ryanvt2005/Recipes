@@ -219,7 +219,9 @@ const NON_UNIT_WORDS = new Set([
  * @returns {string|null} Normalized unit or null if not a known unit
  */
 function normalizeUnit(unit) {
-  if (!unit) {return null;}
+  if (!unit) {
+    return null;
+  }
 
   const lower = unit.toLowerCase().trim();
 
@@ -239,7 +241,9 @@ function normalizeUnit(unit) {
  * @returns {number|null} Parsed numeric value or null
  */
 function parseQuantity(quantityStr) {
-  if (!quantityStr) {return null;}
+  if (!quantityStr) {
+    return null;
+  }
 
   let str = String(quantityStr).trim();
 
@@ -360,7 +364,11 @@ function parseIngredientString(rawText, sortOrder = 0) {
       ingredientName = words.slice(1).join(' ').trim();
     }
     // Special case: "fluid ounce" is two words
-    else if (words.length > 1 && words[0].toLowerCase() === 'fluid' && words[1].toLowerCase().startsWith('oz')) {
+    else if (
+      words.length > 1 &&
+      words[0].toLowerCase() === 'fluid' &&
+      words[1].toLowerCase().startsWith('oz')
+    ) {
       unit = 'fl oz';
       ingredientName = words.slice(2).join(' ').trim();
     }
@@ -395,7 +403,9 @@ function parseIngredientString(rawText, sortOrder = 0) {
  * @returns {string} Formatted display string
  */
 function formatIngredientDisplay(ingredient) {
-  if (!ingredient) {return '';}
+  if (!ingredient) {
+    return '';
+  }
 
   const { quantity, unit, ingredient: name, rawText } = ingredient;
 
@@ -434,7 +444,9 @@ function formatIngredientDisplay(ingredient) {
  * @returns {string} Formatted quantity string
  */
 function formatQuantityDisplay(quantity) {
-  if (quantity === null || quantity === undefined) {return '';}
+  if (quantity === null || quantity === undefined) {
+    return '';
+  }
 
   const whole = Math.floor(quantity);
   const remainder = quantity - whole;

@@ -2,7 +2,11 @@ const pool = require('../config/database');
 const logger = require('../config/logger');
 const { categorizeIngredient } = require('../utils/ingredientCategorizer');
 const { ErrorCodes, sendError, errors } = require('../utils/errorResponse');
-const { aggregateIngredients, normalizeIngredientName, areUnitsCompatible } = require('../utils/ingredientAggregator');
+const {
+  aggregateIngredients,
+  normalizeIngredientName,
+  areUnitsCompatible,
+} = require('../utils/ingredientAggregator');
 
 /**
  * Parse quantity from ingredient text
@@ -193,7 +197,9 @@ function consolidateIngredients(recipeIngredients, options = {}) {
     let quantity = ing.quantity ?? parsed.quantity;
     if (quantity !== null && quantity !== undefined) {
       quantity = typeof quantity === 'string' ? parseFloat(quantity) : Number(quantity);
-      if (isNaN(quantity)) {quantity = null;}
+      if (isNaN(quantity)) {
+        quantity = null;
+      }
     }
 
     return {
@@ -615,13 +621,25 @@ async function addRecipesToList(req, res) {
       const recipeNames = recipeNamesResult.rows.map((r) => r.title);
 
       if (duplicateRecipeIds.length === 1) {
-        return sendError(res, 400, ErrorCodes.DUPLICATE_RECIPE, `"${recipeNames[0]}" is already in this shopping list`, {
-          duplicateRecipes: recipeNames,
-        });
+        return sendError(
+          res,
+          400,
+          ErrorCodes.DUPLICATE_RECIPE,
+          `"${recipeNames[0]}" is already in this shopping list`,
+          {
+            duplicateRecipes: recipeNames,
+          }
+        );
       } else {
-        return sendError(res, 400, ErrorCodes.DUPLICATE_RECIPE, `${duplicateRecipeIds.length} recipe(s) are already in this shopping list: ${recipeNames.join(', ')}`, {
-          duplicateRecipes: recipeNames,
-        });
+        return sendError(
+          res,
+          400,
+          ErrorCodes.DUPLICATE_RECIPE,
+          `${duplicateRecipeIds.length} recipe(s) are already in this shopping list: ${recipeNames.join(', ')}`,
+          {
+            duplicateRecipes: recipeNames,
+          }
+        );
       }
     }
 
@@ -705,7 +723,8 @@ async function addRecipesToList(req, res) {
         // Check if units are compatible for summing
         if (areUnitsCompatible(mergedItems[key].unit, ing.unit)) {
           // Update existing item quantity - ensure numeric addition, not string concatenation
-          const existingQty = mergedItems[key].quantity !== null ? Number(mergedItems[key].quantity) : null;
+          const existingQty =
+            mergedItems[key].quantity !== null ? Number(mergedItems[key].quantity) : null;
           const newQty = ing.quantity !== null ? Number(ing.quantity) : null;
 
           if (newQty !== null && !isNaN(newQty) && existingQty !== null && !isNaN(existingQty)) {
@@ -769,7 +788,15 @@ async function addRecipesToList(req, res) {
            (shopping_list_id, ingredient_name, quantity, unit, category, recipe_id, notes)
            VALUES ($1, $2, $3, $4, $5, $6, $7)
            RETURNING *`,
-          [listId, item.ingredient_name, item.quantity, item.unit, item.category, item.recipe_id, item.notes || null]
+          [
+            listId,
+            item.ingredient_name,
+            item.quantity,
+            item.unit,
+            item.category,
+            item.recipe_id,
+            item.notes || null,
+          ]
         );
       }
     });
@@ -848,10 +875,9 @@ async function removeRecipeFromList(req, res) {
     const remainingRecipes = remainingRecipesResult.rows;
 
     // Delete all current items from the shopping list
-    await client.query(
-      'DELETE FROM shopping_list_items WHERE shopping_list_id = $1',
-      [shoppingListId]
-    );
+    await client.query('DELETE FROM shopping_list_items WHERE shopping_list_id = $1', [
+      shoppingListId,
+    ]);
 
     // Remove the recipe from shopping_list_recipes join table
     await client.query(
@@ -940,7 +966,9 @@ async function removeRecipeFromList(req, res) {
       [shoppingListId]
     );
 
-    logger.info(`Removed recipe ${recipeId} from shopping list ${shoppingListId}, recomputed with ${remainingRecipes.length} remaining recipes`);
+    logger.info(
+      `Removed recipe ${recipeId} from shopping list ${shoppingListId}, recomputed with ${remainingRecipes.length} remaining recipes`
+    );
 
     res.json({
       message: 'Recipe removed from shopping list',
@@ -991,10 +1019,9 @@ async function recomputeShoppingList(req, res) {
 
     if (recipes.length === 0) {
       // No recipes - just clear items
-      await client.query(
-        'DELETE FROM shopping_list_items WHERE shopping_list_id = $1',
-        [shoppingListId]
-      );
+      await client.query('DELETE FROM shopping_list_items WHERE shopping_list_id = $1', [
+        shoppingListId,
+      ]);
 
       await client.query('COMMIT');
 
@@ -1018,10 +1045,9 @@ async function recomputeShoppingList(req, res) {
     );
 
     // Delete all current items
-    await client.query(
-      'DELETE FROM shopping_list_items WHERE shopping_list_id = $1',
-      [shoppingListId]
-    );
+    await client.query('DELETE FROM shopping_list_items WHERE shopping_list_id = $1', [
+      shoppingListId,
+    ]);
 
     if (ingredientsResult.rows.length > 0) {
       // Scale ingredients if needed

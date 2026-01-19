@@ -52,7 +52,12 @@ async function extractRecipeFromUrl(req, res) {
     }
 
     logger.error('Recipe extraction error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.EXTRACTION_ERROR, 'An unexpected error occurred during extraction');
+    return sendError(
+      res,
+      500,
+      ErrorCodes.EXTRACTION_ERROR,
+      'An unexpected error occurred during extraction'
+    );
   }
 }
 
@@ -545,7 +550,12 @@ async function getScaledRecipe(req, res) {
   try {
     // Validate target servings
     if (!targetServings || targetServings <= 0) {
-      return sendError(res, 400, ErrorCodes.INVALID_SERVINGS, 'Target servings must be a positive number');
+      return sendError(
+        res,
+        400,
+        ErrorCodes.INVALID_SERVINGS,
+        'Target servings must be a positive number'
+      );
     }
 
     // Get the original recipe

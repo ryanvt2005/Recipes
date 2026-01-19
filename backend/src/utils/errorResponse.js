@@ -73,8 +73,7 @@ const errors = {
   unauthorized: (res, message = 'Unauthorized') =>
     sendError(res, 401, ErrorCodes.UNAUTHORIZED, message),
 
-  forbidden: (res, message = 'Forbidden') =>
-    sendError(res, 403, ErrorCodes.FORBIDDEN, message),
+  forbidden: (res, message = 'Forbidden') => sendError(res, 403, ErrorCodes.FORBIDDEN, message),
 
   notFound: (res, message = 'Resource not found') =>
     sendError(res, 404, ErrorCodes.NOT_FOUND, message),
