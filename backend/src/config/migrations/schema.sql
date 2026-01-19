@@ -136,7 +136,44 @@ CREATE TABLE IF NOT EXISTS shopping_list_items (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Add recipe_id column if it doesn't exist (for existing databases)
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                   WHERE table_name = 'shopping_list_items' AND column_name = 'recipe_id') THEN
+        ALTER TABLE shopping_list_items ADD COLUMN recipe_id UUID REFERENCES recipes(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_shopping_list_items_list_id ON shopping_list_items(shopping_list_id);
+CREATE INDEX IF NOT EXISTS idx_shopping_list_items_recipe_id ON shopping_list_items(recipe_id);
+
+-- Shopping List Recipes junction table (tracks which recipes are in each shopping list)
+CREATE TABLE IF NOT EXISTS shopping_list_recipes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shopping_list_id UUID NOT NULL REFERENCES shopping_lists(id) ON DELETE CASCADE,
+  recipe_id UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+  scaled_servings INTEGER,
+  added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(shopping_list_id, recipe_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_shopping_list_recipes_list ON shopping_list_recipes(shopping_list_id);
+CREATE INDEX IF NOT EXISTS idx_shopping_list_recipes_recipe ON shopping_list_recipes(recipe_id);
+
+-- Recipe Notes table
+CREATE TABLE IF NOT EXISTS recipe_notes (
+  id SERIAL PRIMARY KEY,
+  recipe_id UUID NOT NULL REFERENCES recipes(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  note_text TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT recipe_notes_recipe_user_unique UNIQUE (recipe_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_recipe_notes_recipe_id ON recipe_notes(recipe_id);
+CREATE INDEX IF NOT EXISTS idx_recipe_notes_user_id ON recipe_notes(user_id);
 
 -- Recipe Extraction Cache table
 CREATE TABLE IF NOT EXISTS recipe_extraction_cache (
@@ -160,15 +197,23 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Triggers for updated_at
+-- Triggers for updated_at (drop first if they exist to make migrations idempotent)
+DROP TRIGGER IF EXISTS update_users_updated_at ON users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON users
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_recipes_updated_at ON recipes;
 CREATE TRIGGER update_recipes_updated_at BEFORE UPDATE ON recipes
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_meal_plans_updated_at ON meal_plans;
 CREATE TRIGGER update_meal_plans_updated_at BEFORE UPDATE ON meal_plans
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_shopping_lists_updated_at ON shopping_lists;
 CREATE TRIGGER update_shopping_lists_updated_at BEFORE UPDATE ON shopping_lists
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+DROP TRIGGER IF EXISTS recipe_notes_updated_at ON recipe_notes;
+CREATE TRIGGER recipe_notes_updated_at BEFORE UPDATE ON recipe_notes
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
