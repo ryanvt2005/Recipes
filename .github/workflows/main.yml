@@ -135,6 +135,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy Application
+        timeout-minutes: 20
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
