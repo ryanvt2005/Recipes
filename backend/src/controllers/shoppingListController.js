@@ -193,7 +193,7 @@ function consolidateIngredients(recipeIngredients, options = {}) {
     let quantity = ing.quantity ?? parsed.quantity;
     if (quantity !== null && quantity !== undefined) {
       quantity = typeof quantity === 'string' ? parseFloat(quantity) : Number(quantity);
-      if (isNaN(quantity)) quantity = null;
+      if (isNaN(quantity)) {quantity = null;}
     }
 
     return {

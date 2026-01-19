@@ -10,7 +10,7 @@
  * @module ingredientAggregator
  */
 
-const { normalizeUnit, parseQuantity, parseIngredientString, UNIT_MAP } = require('./ingredientParser');
+const { normalizeUnit, parseIngredientString, UNIT_MAP } = require('./ingredientParser');
 
 // ============================================
 // Unit Compatibility
@@ -78,16 +78,16 @@ function areUnitsCompatible(unitA, unitB) {
   const normalizedB = unitB === '' ? null : unitB;
 
   // Both null/empty = compatible (unitless items)
-  if (normalizedA === null && normalizedB === null) return true;
+  if (normalizedA === null && normalizedB === null) {return true;}
 
   // One null, one not = incompatible
-  if (normalizedA === null || normalizedB === null) return false;
+  if (normalizedA === null || normalizedB === null) {return false;}
 
   // Same unit = compatible
   const normA = normalizeUnit(normalizedA) || normalizedA?.toLowerCase();
   const normB = normalizeUnit(normalizedB) || normalizedB?.toLowerCase();
 
-  if (normA === normB) return true;
+  if (normA === normB) {return true;}
 
   // Check if in same conversion group
   const convA = UNIT_CONVERSION[normA];
@@ -100,46 +100,9 @@ function areUnitsCompatible(unitA, unitB) {
   return false;
 }
 
-/**
- * Get the preferred display unit for a group
- * @param {string} unit - A unit in the group
- * @returns {string} The preferred unit for display
- */
-function getPreferredUnit(unit) {
-  const norm = normalizeUnit(unit) || unit?.toLowerCase();
-  const conv = UNIT_CONVERSION[norm];
-
-  if (!conv) return norm;
-
-  // Prefer common units for display
-  const preferredByGroup = {
-    'volume-small': 'tbsp',
-    'volume-large': 'cup',
-    'volume-metric': 'ml',
-    'weight-metric': 'g',
-    'weight-imperial': 'oz',
-  };
-
-  return preferredByGroup[conv.group] || norm;
-}
-
 // ============================================
 // Ingredient Name Normalization
 // ============================================
-
-/**
- * Bell pepper color variants that should be grouped together
- */
-const BELL_PEPPER_COLORS = ['red', 'green', 'yellow', 'orange', 'mixed'];
-
-/**
- * Patterns for bell pepper detection
- */
-const BELL_PEPPER_PATTERNS = [
-  /^(red|green|yellow|orange)\s+bell\s+pepper/i,
-  /^bell\s+pepper/i,
-  /^(red|green|yellow|orange)\s+pepper$/i, // "red pepper" without "bell" - be careful
-];
 
 /**
  * Common compound ingredients that should normalize to a canonical form
@@ -714,7 +677,7 @@ function singularize(word) {
  * @returns {string} Capitalized string
  */
 function capitalizeFirst(str) {
-  if (!str) return '';
+  if (!str) {return '';}
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
@@ -751,7 +714,7 @@ function capitalizeFirst(str) {
  *   notes?: string,
  * }
  */
-function aggregateIngredients(lines, options = {}) {
+function aggregateIngredients(lines, _options = {}) {
   if (!Array.isArray(lines) || lines.length === 0) {
     return [];
   }
@@ -810,7 +773,7 @@ function aggregateIngredients(lines, options = {}) {
   // Process each group into an AggregatedItem
   const results = [];
 
-  for (const [canonicalKey, group] of groups) {
+  for (const group of groups.values()) {
     const aggregated = processGroup(group);
     results.push(aggregated);
   }
@@ -982,16 +945,16 @@ function sumQuantities(items) {
  * Convert quantity from one unit to another (within same group)
  */
 function convertToCommonUnit(quantity, fromUnit, toUnit) {
-  if (quantity === null || quantity === undefined) return 0;
+  if (quantity === null || quantity === undefined) {return 0;}
 
   // Ensure quantity is a number
   const numericQty = typeof quantity === 'string' ? parseFloat(quantity) : Number(quantity);
-  if (isNaN(numericQty)) return 0;
+  if (isNaN(numericQty)) {return 0;}
 
   const normFrom = normalizeUnit(fromUnit) || fromUnit?.toLowerCase();
   const normTo = normalizeUnit(toUnit) || toUnit?.toLowerCase();
 
-  if (normFrom === normTo) return numericQty;
+  if (normFrom === normTo) {return numericQty;}
 
   const convFrom = UNIT_CONVERSION[normFrom];
   const convTo = UNIT_CONVERSION[normTo];
@@ -1026,7 +989,7 @@ function buildNotesFromItems(items) {
  * Extract ingredient name from raw text (basic fallback)
  */
 function extractNameFromText(text) {
-  if (!text) return '';
+  if (!text) {return '';}
 
   // Remove quantity patterns
   let name = text.replace(/^[\d\s½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞/.-]+/, '').trim();
