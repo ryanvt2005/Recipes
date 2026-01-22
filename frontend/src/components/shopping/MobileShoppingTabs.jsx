@@ -8,6 +8,7 @@ export default function MobileShoppingTabs({
   recipes,
   onToggleItem,
   onUpdateCategory,
+  onDeleteItem,
   onRemoveRecipe,
   formatQuantity,
   checkedCount,
@@ -55,6 +56,7 @@ export default function MobileShoppingTabs({
             items={items}
             onToggleItem={onToggleItem}
             onUpdateCategory={onUpdateCategory}
+            onDeleteItem={onDeleteItem}
             formatQuantity={formatQuantity}
             isMobile={true}
           />

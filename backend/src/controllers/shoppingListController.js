@@ -537,6 +537,37 @@ async function updateItem(req, res) {
 }
 
 /**
+ * Delete a single item from a shopping list
+ */
+async function deleteItem(req, res) {
+  const { id } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    // Verify the item belongs to the user's shopping list
+    const verifyResult = await pool.query(
+      `SELECT sli.id, sl.id as list_id FROM shopping_list_items sli
+       INNER JOIN shopping_lists sl ON sli.shopping_list_id = sl.id
+       WHERE sli.id = $1 AND sl.user_id = $2`,
+      [id, userId]
+    );
+
+    if (verifyResult.rows.length === 0) {
+      return errors.notFound(res, 'Shopping list item not found');
+    }
+
+    // Delete the item
+    await pool.query('DELETE FROM shopping_list_items WHERE id = $1', [id]);
+
+    logger.info('Shopping list item deleted', { userId, itemId: id });
+    res.json({ message: 'Item deleted successfully' });
+  } catch (error) {
+    logger.error('Error deleting shopping list item', { error: error.message });
+    return errors.internal(res, 'Failed to delete item');
+  }
+}
+
+/**
  * Delete a shopping list
  */
 async function deleteShoppingList(req, res) {
@@ -1111,6 +1142,7 @@ module.exports = {
   getUserShoppingLists,
   getShoppingList,
   updateItem,
+  deleteItem,
   deleteShoppingList,
   addRecipesToList,
   removeRecipeFromList,

@@ -89,6 +89,19 @@ export default function ShoppingListPage() {
     }
   };
 
+  const handleDeleteItem = async (itemId, itemName) => {
+    if (!confirm(`Delete "${itemName}" from this shopping list?`)) {
+      return;
+    }
+
+    try {
+      await shoppingLists.deleteItem(itemId);
+      setItems(items.filter((item) => item.id !== itemId));
+    } catch (err) {
+      setError('Failed to delete item');
+    }
+  };
+
   // Use the core formatQuantityWithUnit function for consistent formatting
   const formatQuantity = formatQuantityWithUnit;
 
@@ -181,6 +194,7 @@ export default function ShoppingListPage() {
             recipes={recipes}
             onToggleItem={toggleItemChecked}
             onUpdateCategory={updateItemCategory}
+            onDeleteItem={handleDeleteItem}
             onRemoveRecipe={handleRemoveRecipe}
             formatQuantity={formatQuantity}
             checkedCount={checkedCount}
@@ -196,6 +210,7 @@ export default function ShoppingListPage() {
               items={items}
               onToggleItem={toggleItemChecked}
               onUpdateCategory={updateItemCategory}
+              onDeleteItem={handleDeleteItem}
               formatQuantity={formatQuantity}
               isMobile={false}
             />

@@ -46,6 +46,13 @@ export const shoppingApi = {
   updateItem: (itemId, data) => http.patch(`/shopping-lists/items/${itemId}`, data),
 
   /**
+   * Delete a single shopping list item
+   * @param {string|number} itemId - Shopping list item ID
+   * @returns {Promise} - Response confirming deletion
+   */
+  deleteItem: (itemId) => http.delete(`/shopping-lists/items/${itemId}`),
+
+  /**
    * Delete a shopping list
    * @param {string|number} id - Shopping list ID
    * @returns {Promise} - Response confirming deletion
