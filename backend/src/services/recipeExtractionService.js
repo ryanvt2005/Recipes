@@ -445,8 +445,46 @@ function extractAuthorName(authorField, graph) {
 }
 
 /**
+ * Calculate extraction quality score based on which fields are present
+ * Returns an object with score (0-100) and list of missing fields
+ */
+function calculateExtractionQuality(recipe) {
+  const fields = [
+    { key: 'title', weight: 20, label: 'title' },
+    { key: 'ingredients', weight: 25, label: 'ingredients', isArray: true },
+    { key: 'instructions', weight: 25, label: 'instructions', isArray: true },
+    { key: 'description', weight: 5, label: 'description' },
+    { key: 'author', weight: 5, label: 'author' },
+    { key: 'imageUrl', weight: 5, label: 'image' },
+    { key: 'servings', weight: 5, label: 'servings' },
+    { key: 'prepTime', weight: 3, label: 'prep time' },
+    { key: 'cookTime', weight: 3, label: 'cook time' },
+    { key: 'totalTime', weight: 4, label: 'total time' },
+  ];
+
+  let score = 0;
+  const missing = [];
+
+  for (const field of fields) {
+    const value = recipe[field.key];
+    const hasValue = field.isArray
+      ? Array.isArray(value) && value.length > 0
+      : value !== null && value !== undefined && value !== '';
+
+    if (hasValue) {
+      score += field.weight;
+    } else {
+      missing.push(field.label);
+    }
+  }
+
+  return { score, missing };
+}
+
+/**
  * Extract recipe from schema.org JSON-LD
  * Supports both direct Recipe objects and @graph structures
+ * Uses partial extraction - returns what's available even if some fields are missing
  */
 function extractRecipeFromSchema(html) {
   const $ = cheerio.load(html);
@@ -480,9 +518,9 @@ function extractRecipeFromSchema(html) {
         continue;
       }
 
-      // Validate required fields
-      if (!recipeData.name || !recipeData.recipeIngredient || !recipeData.recipeInstructions) {
-        logger.warn('Incomplete schema.org recipe data');
+      // Title is the only truly required field
+      if (!recipeData.name) {
+        logger.warn('Schema.org recipe missing title, skipping');
         continue;
       }
 
@@ -502,15 +540,25 @@ function extractRecipeFromSchema(html) {
         instructions: parseSchemaInstructions(recipeData.recipeInstructions),
       };
 
-      // Final validation
-      if (recipe.ingredients.length > 0 && recipe.instructions.length > 0) {
-        logger.info('Successfully extracted recipe from schema.org', {
+      // Calculate quality score
+      const quality = calculateExtractionQuality(recipe);
+      recipe.extractionQuality = quality;
+
+      // Log with quality info
+      if (quality.missing.length > 0) {
+        logger.warn('Partial recipe extraction from schema.org', {
           title: recipe.title,
-          author: recipe.author,
-          ingredientCount: recipe.ingredients.length,
+          score: quality.score,
+          missing: quality.missing,
         });
-        return recipe;
+      } else {
+        logger.info('Complete recipe extraction from schema.org', {
+          title: recipe.title,
+          score: quality.score,
+        });
       }
+
+      return recipe;
     } catch (error) {
       logger.warn('Failed to parse JSON-LD', { error: error.message });
       continue;
@@ -609,30 +657,43 @@ ${cleanedHtml}`;
 
     const recipe = JSON.parse(cleanedJson);
 
-    // Validate
-    if (!recipe.title || !recipe.ingredients || !recipe.instructions) {
+    // Validate - title is required, ingredients and instructions are strongly preferred
+    if (!recipe.title) {
       throw new RecipeExtractionError(
-        'Incomplete recipe extraction from LLM',
+        'Could not extract recipe title from this page.',
         'LLM_EXTRACTION_FAILED',
-        'The LLM could not extract complete recipe information'
+        'The LLM could not extract a recipe title'
       );
     }
 
-    if (recipe.ingredients.length === 0 || recipe.instructions.length === 0) {
+    if (
+      (!recipe.ingredients || recipe.ingredients.length === 0) &&
+      (!recipe.instructions || recipe.instructions.length === 0)
+    ) {
       throw new RecipeExtractionError(
-        'Recipe missing required fields',
+        'No recipe content found on this page. The URL may not contain a recipe.',
         'LLM_EXTRACTION_FAILED',
         'No ingredients or instructions found'
       );
     }
 
     // Ensure ingredients have sortOrder
-    recipe.ingredients = recipe.ingredients.map((ing, index) => ({
+    recipe.ingredients = (recipe.ingredients || []).map((ing, index) => ({
       ...ing,
       sortOrder: ing.sortOrder || index,
     }));
 
-    logger.info('Successfully extracted recipe with LLM');
+    recipe.instructions = recipe.instructions || [];
+
+    // Calculate quality score
+    const quality = calculateExtractionQuality(recipe);
+    recipe.extractionQuality = quality;
+
+    logger.info('Successfully extracted recipe with LLM', {
+      title: recipe.title,
+      score: quality.score,
+      missing: quality.missing,
+    });
     return recipe;
   } catch (error) {
     if (error instanceof RecipeExtractionError) {
@@ -665,9 +726,23 @@ async function extractRecipe(url) {
   let recipe = extractRecipeFromSchema(html);
   let extractionMethod = 'schema';
 
-  // If schema extraction failed or incomplete, fall back to LLM
+  if (recipe) {
+    const quality = recipe.extractionQuality;
+
+    // If schema extraction is missing core content (ingredients or instructions),
+    // fall back to LLM for a complete extraction
+    if (quality && quality.missing.includes('ingredients') && quality.missing.includes('instructions')) {
+      logger.info('Schema extraction missing core fields, falling back to LLM', {
+        score: quality.score,
+        missing: quality.missing,
+      });
+      recipe = null; // Force LLM fallback
+    }
+  }
+
+  // If schema extraction failed or was too incomplete, fall back to LLM
   if (!recipe) {
-    logger.info('Schema extraction failed, falling back to LLM');
+    logger.info('Schema extraction failed or incomplete, falling back to LLM');
     recipe = await extractRecipeWithLLM(html);
     extractionMethod = 'llm';
 
