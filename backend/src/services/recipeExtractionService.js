@@ -765,4 +765,15 @@ async function extractRecipe(url) {
 module.exports = {
   extractRecipe,
   RecipeExtractionError,
+  // Export for testing
+  parseServings,
+  parseDuration,
+  extractImageUrl,
+  extractAuthorName,
+  resolveIdReference,
+  isRecipeType,
+  calculateExtractionQuality,
+  parseSchemaIngredients,
+  parseSchemaInstructions,
+  normalizeUrl,
 };
