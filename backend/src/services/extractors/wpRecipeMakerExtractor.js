@@ -51,7 +51,7 @@ function extractTitle($) {
 
   for (const selector of selectors) {
     const text = $(selector).first().text().trim();
-    if (text) return text;
+    if (text) {return text;}
   }
 
   return null;
@@ -67,7 +67,7 @@ function extractDescription($) {
 
   for (const selector of selectors) {
     const text = $(selector).first().text().trim();
-    if (text) return text;
+    if (text) {return text;}
   }
 
   return null;
@@ -185,7 +185,7 @@ function extractServings($) {
     const text = container.text().trim();
     if (text) {
       const match = text.match(/(\d+)/);
-      if (match) return match[1];
+      if (match) {return match[1];}
     }
   }
 
@@ -251,10 +251,10 @@ function parseIngredientElement($, elem, sortOrder, group) {
 
   // Build raw text
   let rawText = '';
-  if (amount) rawText += amount + ' ';
-  if (unit) rawText += unit + ' ';
-  if (name) rawText += name;
-  if (notes) rawText += ', ' + notes;
+  if (amount) {rawText += amount + ' ';}
+  if (unit) {rawText += unit + ' ';}
+  if (name) {rawText += name;}
+  if (notes) {rawText += ', ' + notes;}
   rawText = rawText.trim();
 
   // Fallback to full text if structured parsing failed
@@ -262,7 +262,7 @@ function parseIngredientElement($, elem, sortOrder, group) {
     rawText = $elem.text().trim();
   }
 
-  if (!rawText) return null;
+  if (!rawText) {return null;}
 
   // Use the ingredient parser for consistent parsing
   const parsed = parseIngredientString(rawText, sortOrder);
@@ -324,7 +324,7 @@ function extractInstructionText($, elem) {
   // Fallback: get full text but remove leading numbers
   let text = $elem.text().trim();
   // Remove leading step numbers like "1." or "1)"
-  text = text.replace(/^\d+[\.\)]\s*/, '');
+  text = text.replace(/^\d+[.)]\s*/, '');
 
   return text || null;
 }

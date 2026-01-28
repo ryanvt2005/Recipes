@@ -162,8 +162,10 @@ const PREFERRED_VOLUME_UNITS = [
  * @returns {boolean} - Whether the unit is a convertible volume unit
  */
 function isVolumeUnit(unit) {
-  if (!unit) return false;
-  return VOLUME_UNITS.hasOwnProperty(unit.toLowerCase().trim());
+  if (!unit) {
+    return false;
+  }
+  return Object.prototype.hasOwnProperty.call(VOLUME_UNITS, unit.toLowerCase().trim());
 }
 
 /**
@@ -174,12 +176,12 @@ function isVolumeUnit(unit) {
  * @returns {number} - The converted quantity
  */
 function convertVolume(quantity, fromUnit, toUnit) {
-  if (!quantity || !fromUnit || !toUnit) return quantity;
+  if (!quantity || !fromUnit || !toUnit) {return quantity;}
 
   const from = VOLUME_UNITS[fromUnit.toLowerCase().trim()];
   const to = VOLUME_UNITS[toUnit.toLowerCase().trim()];
 
-  if (!from || !to) return quantity;
+  if (!from || !to) {return quantity;}
 
   // Convert to teaspoons, then to target unit
   const inTeaspoons = quantity * from.teaspoons;
