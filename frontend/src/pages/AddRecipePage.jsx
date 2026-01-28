@@ -288,9 +288,11 @@ export default function AddRecipePage() {
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
                         {extractionMeta.method === 'schema'
                           ? 'Schema.org'
-                          : extractionMeta.method === 'llm'
-                            ? 'AI Extraction'
-                            : 'Unknown'}
+                          : extractionMeta.method === 'wprm'
+                            ? 'WP Recipe Maker'
+                            : extractionMeta.method === 'llm'
+                              ? 'AI Extraction'
+                              : 'Unknown'}
                       </span>
                     </div>
                     {extractionMeta.quality && (

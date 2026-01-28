@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const pool = require('../config/database');
 const logger = require('../config/logger');
 const { parseIngredientString: parseIngredient } = require('../utils/ingredientParser');
+const { extractFromWPRM } = require('./extractors/wpRecipeMakerExtractor');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -711,6 +712,12 @@ ${cleanedHtml}`;
 
 /**
  * Main extraction function
+ *
+ * Extraction pipeline (in order of preference):
+ * 1. Cache - Return cached result if available
+ * 2. Schema.org JSON-LD - Fastest and most reliable
+ * 3. WP Recipe Maker HTML - Fallback for sites using WPRM plugin
+ * 4. LLM (Claude) - Last resort, most expensive but handles any format
  */
 async function extractRecipe(url) {
   // Check cache first
@@ -722,7 +729,7 @@ async function extractRecipe(url) {
   // Fetch HTML
   const html = await fetchHtml(url);
 
-  // Try schema.org extraction first
+  // Try schema.org extraction first (fastest, most reliable)
   let recipe = extractRecipeFromSchema(html);
   let extractionMethod = 'schema';
 
@@ -730,19 +737,40 @@ async function extractRecipe(url) {
     const quality = recipe.extractionQuality;
 
     // If schema extraction is missing core content (ingredients or instructions),
-    // fall back to LLM for a complete extraction
+    // try other methods
     if (quality && quality.missing.includes('ingredients') && quality.missing.includes('instructions')) {
-      logger.info('Schema extraction missing core fields, falling back to LLM', {
+      logger.info('Schema extraction missing core fields', {
         score: quality.score,
         missing: quality.missing,
       });
-      recipe = null; // Force LLM fallback
+      recipe = null; // Try next method
     }
   }
 
-  // If schema extraction failed or was too incomplete, fall back to LLM
+  // Try WP Recipe Maker HTML extraction (common WordPress plugin)
   if (!recipe) {
-    logger.info('Schema extraction failed or incomplete, falling back to LLM');
+    logger.info('Trying WP Recipe Maker HTML extraction');
+    recipe = extractFromWPRM(html);
+    if (recipe) {
+      extractionMethod = 'wprm';
+      // Calculate quality score for WPRM extraction
+      recipe.extractionQuality = calculateExtractionQuality(recipe);
+
+      // If WPRM extraction is also missing core content, continue to LLM
+      const quality = recipe.extractionQuality;
+      if (quality.missing.includes('ingredients') && quality.missing.includes('instructions')) {
+        logger.info('WPRM extraction missing core fields, falling back to LLM', {
+          score: quality.score,
+          missing: quality.missing,
+        });
+        recipe = null;
+      }
+    }
+  }
+
+  // Fall back to LLM extraction (most expensive, but handles any format)
+  if (!recipe) {
+    logger.info('Falling back to LLM extraction');
     recipe = await extractRecipeWithLLM(html);
     extractionMethod = 'llm';
 
