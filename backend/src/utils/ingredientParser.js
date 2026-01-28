@@ -374,16 +374,25 @@ function parseIngredientString(rawText, sortOrder = 0) {
   const original = rawText.trim();
 
   // Check for "to taste" patterns - these have null quantity
-  let isToTaste = false;
-  for (const pattern of TO_TASTE_PATTERNS) {
-    if (pattern.test(original)) {
-      isToTaste = true;
+  let matchedToTastePhrase = null;
+  const toTastePhrasePatterns = [
+    { regex: /\bto\s+taste\b/i, phrase: 'to taste' },
+    { regex: /\bas\s+needed\b/i, phrase: 'as needed' },
+    { regex: /\bto\s+your\s+(liking|preference)\b/i, phrase: 'to taste' },
+    { regex: /\boptional\b/i, phrase: 'optional' },
+    { regex: /\bfor\s+garnish\b/i, phrase: 'for garnish' },
+    { regex: /\bfor\s+serving\b/i, phrase: 'for serving' },
+  ];
+
+  for (const { regex, phrase } of toTastePhrasePatterns) {
+    if (regex.test(original)) {
+      matchedToTastePhrase = phrase;
       break;
     }
   }
 
-  // If "to taste", return early with the full text as ingredient
-  if (isToTaste) {
+  // If "to taste" pattern found, return early with the full text as ingredient
+  if (matchedToTastePhrase) {
     // Try to extract the ingredient name (remove the "to taste" part for cleaner display)
     let ingredientName = original
       .replace(
@@ -400,7 +409,8 @@ function parseIngredientString(rawText, sortOrder = 0) {
       quantity: null,
       unit: null,
       ingredient: ingredientName || original,
-      preparation: 'to taste',
+      preparation: null,
+      notes: matchedToTastePhrase,
       group: null,
     };
   }

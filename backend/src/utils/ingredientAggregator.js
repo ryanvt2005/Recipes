@@ -131,39 +131,72 @@ const COMPOUND_NORMALIZATIONS = {
 };
 
 /**
- * Modifiers that should be stripped to find the core ingredient
- * These are preparation methods, textures, qualities, and sizes
+ * TIER 1: Preparation method modifiers
+ * These describe HOW an ingredient is prepared, not WHAT you buy
+ * Strip these first as they don't affect purchasing decisions
  */
-const MODIFIER_PATTERNS = [
-  // Preparation methods
-  /\b(shredded|grated|sliced|diced|chopped|minced|crushed|ground|whole|halved|quartered)\b/gi,
+const PREP_MODIFIER_PATTERNS = [
+  // Cutting methods
+  /\b(shredded|grated|sliced|diced|chopped|minced|crushed|ground|halved|quartered)\b/gi,
   /\b(cubed|julienned|chiffonade|rough[- ]?chopped|finely[- ]?chopped|coarsely[- ]?chopped)\b/gi,
-  /\b(melted|softened|room[- ]?temperature|cold|chilled|frozen|thawed)\b/gi,
-  /\b(toasted|roasted|sautéed|sauteed|fried|baked|grilled|smoked|cured|dried|dehydrated)\b/gi,
-  /\b(blanched|steamed|poached|braised|caramelized|charred)\b/gi,
-  /\b(peeled|unpeeled|seeded|unseeded|cored|pitted|trimmed|cleaned)\b/gi,
+  /\b(thinly[- ]?sliced|thickly[- ]?sliced|matchstick|spiralized|riced)\b/gi,
+
+  // Cooking state (describes how to prepare, not what to buy)
+  /\b(melted|softened|room[- ]?temperature|chilled|thawed)\b/gi,
+  /\b(toasted|roasted|sautéed|sauteed|fried|baked|grilled|charred)\b/gi,
+  /\b(blanched|steamed|poached|braised|caramelized)\b/gi,
   /\b(beaten|whisked|whipped|creamed|mashed|pureed|puréed|blended)\b/gi,
 
+  // Preparation actions
+  /\b(peeled|unpeeled|seeded|unseeded|cored|pitted|trimmed|cleaned|deveined)\b/gi,
+  /\b(drained|rinsed|patted[- ]?dry|pressed)\b/gi,
+  /\b(packed|loosely[- ]?packed|tightly[- ]?packed)\b/gi,
+
+  // Freshness indicators that describe prep, not purchase
+  /\b(freshly[- ]?ground|freshly[- ]?grated|freshly[- ]?chopped|freshly[- ]?squeezed)\b/gi,
+  /\b(freshly)\b/gi, // Standalone "freshly" is also a prep modifier
+];
+
+/**
+ * TIER 2: Quality and attribute modifiers
+ * These describe WHAT kind of ingredient to buy
+ * Strip these only if needed for matching, as they may affect purchasing
+ */
+const QUALITY_MODIFIER_PATTERNS = [
   // Quality/grade descriptors
   /\b(extra[- ]?sharp|sharp|mild|medium|aged|young|mature|vintage)\b/gi,
   /\b(extra[- ]?virgin|virgin|pure|refined|unrefined|raw|organic|natural)\b/gi,
-  /\b(fresh|freshly|dried|dry|canned|jarred|frozen|preserved)\b/gi,
+  /\b(artisan|homemade|store[- ]?bought|premium|gourmet)\b/gi,
+
+  // State/form (may affect what you buy)
+  /\b(fresh|dried|dry|canned|jarred|frozen|preserved|smoked|cured|dehydrated)\b/gi,
+  /\b(cold|warm|hot)\b/gi,
+
+  // Dietary modifiers
   /\b(low[- ]?fat|lowfat|reduced[- ]?fat|fat[- ]?free|skim|whole|part[- ]?skim|2%|1%)\b/gi,
   /\b(low[- ]?sodium|sodium[- ]?free|no[- ]?salt[- ]?added|reduced[- ]?sodium)\b/gi,
   /\b(unsweetened|sweetened|sugar[- ]?free|no[- ]?sugar[- ]?added)\b/gi,
-  /\b(light|lite|heavy|thick|thin|regular)\b/gi,
+  /\b(gluten[- ]?free|vegan|vegetarian|kosher|halal)\b/gi,
+
+  // Consistency/texture
+  /\b(light|lite|heavy|thick|thin|regular|creamy|chunky|smooth)\b/gi,
 
   // Size descriptors
   /\b(large|medium|small|extra[- ]?large|jumbo|baby|mini|petite)\b/gi,
-  /\b(big|little|tiny)\b/gi,
+  /\b(big|little|tiny|bite[- ]?sized?)\b/gi,
 
-  // Temperature/state
-  /\b(unsalted|salted|lightly[- ]?salted)\b/gi,
-  /\b(boneless|skinless|bone[- ]?in|skin[- ]?on)\b/gi,
+  // Salt/seasoning state
+  /\b(unsalted|salted|lightly[- ]?salted|seasoned|unseasoned)\b/gi,
 
-  // Packaging descriptors (often appear in ingredient lists)
-  /\b(packed|loosely[- ]?packed|tightly[- ]?packed)\b/gi,
+  // Meat preparation (affects purchase)
+  /\b(boneless|skinless|bone[- ]?in|skin[- ]?on|trimmed|untrimmed)\b/gi,
 ];
+
+/**
+ * Combined modifiers for backwards compatibility
+ * Use tiered stripping functions for more precise control
+ */
+const MODIFIER_PATTERNS = [...PREP_MODIFIER_PATTERNS, ...QUALITY_MODIFIER_PATTERNS];
 
 /**
  * Core ingredient mappings - map specific variants to their base ingredient
@@ -1002,23 +1035,617 @@ const INGREDIENT_FAMILY_MAP = [
     canonical: 'hot sauce',
     display: 'Hot sauce',
   },
+
+  // === EXTENDED MAPPINGS (Phase 3) ===
+
+  // Additional dairy products
+  {
+    pattern: /\b(condensed milk|sweetened condensed milk)\b/i,
+    canonical: 'condensed milk',
+    display: 'Condensed milk',
+  },
+  {
+    pattern: /\b(evaporated milk)\b/i,
+    canonical: 'evaporated milk',
+    display: 'Evaporated milk',
+  },
+  {
+    pattern: /\b(whipped cream|whipped topping|cool whip)\b/i,
+    canonical: 'whipped cream',
+    display: 'Whipped cream',
+  },
+  {
+    pattern: /\b(mascarpone|mascarpone cheese)\b/i,
+    canonical: 'mascarpone',
+    display: 'Mascarpone',
+  },
+  {
+    pattern: /\b(queso fresco|queso blanco|cotija)\s*(cheese)?\b/i,
+    canonical: 'queso fresco',
+    display: 'Queso fresco',
+  },
+
+  // Seafood variants
+  {
+    pattern: /\b(shrimp|prawns|large shrimp|jumbo shrimp|medium shrimp)\b/i,
+    canonical: 'shrimp',
+    display: 'Shrimp',
+  },
+  {
+    pattern: /\b(salmon|salmon fillet|fresh salmon|atlantic salmon|wild salmon|sockeye)\b/i,
+    canonical: 'salmon',
+    display: 'Salmon',
+  },
+  {
+    pattern: /\b(tuna|tuna steak|ahi tuna|canned tuna|tuna fish)\b/i,
+    canonical: 'tuna',
+    display: 'Tuna',
+  },
+  {
+    pattern: /\b(cod|cod fillet|fresh cod|pacific cod|atlantic cod)\b/i,
+    canonical: 'cod',
+    display: 'Cod',
+  },
+  {
+    pattern: /\b(tilapia|tilapia fillet)\b/i,
+    canonical: 'tilapia',
+    display: 'Tilapia',
+  },
+  {
+    pattern: /\b(crab|crab meat|lump crab|claw crab|imitation crab)\b/i,
+    canonical: 'crab',
+    display: 'Crab',
+  },
+  {
+    pattern: /\b(lobster|lobster tail|lobster meat)\b/i,
+    canonical: 'lobster',
+    display: 'Lobster',
+  },
+  {
+    pattern: /\b(scallop|sea scallop|bay scallop)\b/i,
+    canonical: 'scallops',
+    display: 'Scallops',
+  },
+  {
+    pattern: /\b(clam|little neck clam|cherrystone|manila clam)\b/i,
+    canonical: 'clams',
+    display: 'Clams',
+  },
+  {
+    pattern: /\b(mussel|black mussel)\b/i,
+    canonical: 'mussels',
+    display: 'Mussels',
+  },
+  {
+    pattern: /\b(anchovy|anchovies|anchovy fillet)\b/i,
+    canonical: 'anchovies',
+    display: 'Anchovies',
+  },
+
+  // Turkey variants
+  {
+    pattern: /\b(ground turkey|lean ground turkey)\b/i,
+    canonical: 'ground turkey',
+    display: 'Ground turkey',
+  },
+  {
+    pattern: /\b(turkey breast|turkey cutlet)\b/i,
+    canonical: 'turkey breast',
+    display: 'Turkey breast',
+  },
+
+  // Lamb variants
+  {
+    pattern: /\b(ground lamb|minced lamb)\b/i,
+    canonical: 'ground lamb',
+    display: 'Ground lamb',
+  },
+  {
+    pattern: /\b(lamb chop|lamb loin chop|rack of lamb)\b/i,
+    canonical: 'lamb chops',
+    display: 'Lamb chops',
+  },
+  {
+    pattern: /\b(lamb leg|leg of lamb|lamb shank)\b/i,
+    canonical: 'leg of lamb',
+    display: 'Leg of lamb',
+  },
+
+  // Common fruits
+  {
+    pattern: /\b(apple|granny smith|honeycrisp|gala|fuji|red delicious|green apple)\b/i,
+    canonical: 'apple',
+    display: 'Apple',
+  },
+  {
+    pattern: /\b(orange|navel orange|valencia orange|blood orange)\b/i,
+    canonical: 'orange',
+    display: 'Orange',
+  },
+  {
+    pattern: /\b(banana|ripe banana)\b/i,
+    canonical: 'banana',
+    display: 'Banana',
+  },
+  {
+    pattern: /\b(strawberry|strawberries|fresh strawberry)\b/i,
+    canonical: 'strawberries',
+    display: 'Strawberries',
+  },
+  {
+    pattern: /\b(blueberry|blueberries|fresh blueberry)\b/i,
+    canonical: 'blueberries',
+    display: 'Blueberries',
+  },
+  {
+    pattern: /\b(raspberry|raspberries|fresh raspberry)\b/i,
+    canonical: 'raspberries',
+    display: 'Raspberries',
+  },
+  {
+    pattern: /\b(blackberry|blackberries)\b/i,
+    canonical: 'blackberries',
+    display: 'Blackberries',
+  },
+  {
+    pattern: /\b(mango|ripe mango|fresh mango)\b/i,
+    canonical: 'mango',
+    display: 'Mango',
+  },
+  {
+    pattern: /\b(pineapple|fresh pineapple|pineapple chunk)\b/i,
+    canonical: 'pineapple',
+    display: 'Pineapple',
+  },
+  {
+    pattern: /\b(peach|peaches|fresh peach|ripe peach)\b/i,
+    canonical: 'peach',
+    display: 'Peach',
+  },
+  {
+    pattern: /\b(pear|bartlett pear|anjou pear|bosc pear)\b/i,
+    canonical: 'pear',
+    display: 'Pear',
+  },
+  {
+    pattern: /\b(grape|red grape|green grape|seedless grape)\b/i,
+    canonical: 'grapes',
+    display: 'Grapes',
+  },
+  {
+    pattern: /\b(cranberry|cranberries|fresh cranberry|dried cranberry)\b/i,
+    canonical: 'cranberries',
+    display: 'Cranberries',
+  },
+  {
+    pattern: /\b(cherry|cherries|sweet cherry|tart cherry|bing cherry|maraschino)\b/i,
+    canonical: 'cherries',
+    display: 'Cherries',
+  },
+  {
+    pattern: /\b(watermelon)\b/i,
+    canonical: 'watermelon',
+    display: 'Watermelon',
+  },
+  {
+    pattern: /\b(cantaloupe|honeydew)\b/i,
+    canonical: 'melon',
+    display: 'Melon',
+  },
+  {
+    pattern: /\b(kiwi|kiwi fruit|kiwifruit)\b/i,
+    canonical: 'kiwi',
+    display: 'Kiwi',
+  },
+  {
+    pattern: /\b(papaya)\b/i,
+    canonical: 'papaya',
+    display: 'Papaya',
+  },
+  {
+    pattern: /\b(coconut|shredded coconut|coconut flake|coconut milk|coconut cream)\b/i,
+    canonical: 'coconut',
+    display: 'Coconut',
+  },
+  {
+    pattern: /\b(raisin|golden raisin|sultana)\b/i,
+    canonical: 'raisins',
+    display: 'Raisins',
+  },
+  {
+    pattern: /\b(date|medjool date|deglet noor)\b/i,
+    canonical: 'dates',
+    display: 'Dates',
+  },
+  {
+    pattern: /\b(fig|dried fig|fresh fig)\b/i,
+    canonical: 'figs',
+    display: 'Figs',
+  },
+  {
+    pattern: /\b(prune|dried plum)\b/i,
+    canonical: 'prunes',
+    display: 'Prunes',
+  },
+  {
+    pattern: /\b(apricot|dried apricot|fresh apricot)\b/i,
+    canonical: 'apricot',
+    display: 'Apricot',
+  },
+
+  // Asian/ethnic condiments and ingredients
+  {
+    pattern: /\b(fish sauce|nam pla|nuoc mam)\b/i,
+    canonical: 'fish sauce',
+    display: 'Fish sauce',
+  },
+  {
+    pattern: /\b(hoisin sauce|hoisin)\b/i,
+    canonical: 'hoisin sauce',
+    display: 'Hoisin sauce',
+  },
+  {
+    pattern: /\b(oyster sauce)\b/i,
+    canonical: 'oyster sauce',
+    display: 'Oyster sauce',
+  },
+  {
+    pattern: /\b(miso|miso paste|white miso|red miso|yellow miso)\b/i,
+    canonical: 'miso paste',
+    display: 'Miso paste',
+  },
+  {
+    pattern: /\b(rice wine|mirin|shaoxing|sake)\b/i,
+    canonical: 'rice wine',
+    display: 'Rice wine',
+  },
+  {
+    pattern: /\b(teriyaki sauce|teriyaki)\b/i,
+    canonical: 'teriyaki sauce',
+    display: 'Teriyaki sauce',
+  },
+  {
+    pattern: /\b(ponzu|ponzu sauce)\b/i,
+    canonical: 'ponzu sauce',
+    display: 'Ponzu sauce',
+  },
+  {
+    pattern: /\b(gochujang|korean chili paste)\b/i,
+    canonical: 'gochujang',
+    display: 'Gochujang',
+  },
+  {
+    pattern: /\b(sambal|sambal oelek|chili garlic sauce)\b/i,
+    canonical: 'sambal',
+    display: 'Sambal',
+  },
+  {
+    pattern:
+      /\b(curry paste|thai curry paste|red curry paste|green curry paste|yellow curry paste)\b/i,
+    canonical: 'curry paste',
+    display: 'Curry paste',
+  },
+  {
+    pattern: /\b(coconut milk|lite coconut milk|full[- ]?fat coconut milk)\b/i,
+    canonical: 'coconut milk',
+    display: 'Coconut milk',
+  },
+  {
+    pattern: /\b(tahini|sesame paste)\b/i,
+    canonical: 'tahini',
+    display: 'Tahini',
+  },
+  {
+    pattern: /\b(harissa|harissa paste)\b/i,
+    canonical: 'harissa',
+    display: 'Harissa',
+  },
+  {
+    pattern: /\b(za'atar|zaatar)\b/i,
+    canonical: "za'atar",
+    display: "Za'atar",
+  },
+  {
+    pattern: /\b(sumac)\b/i,
+    canonical: 'sumac',
+    display: 'Sumac',
+  },
+
+  // Additional pantry staples
+  {
+    pattern:
+      /\b(peanut butter|creamy peanut butter|crunchy peanut butter|natural peanut butter)\b/i,
+    canonical: 'peanut butter',
+    display: 'Peanut butter',
+  },
+  {
+    pattern: /\b(almond butter)\b/i,
+    canonical: 'almond butter',
+    display: 'Almond butter',
+  },
+  {
+    pattern: /\b(molasses|blackstrap molasses)\b/i,
+    canonical: 'molasses',
+    display: 'Molasses',
+  },
+  {
+    pattern: /\b(corn syrup|light corn syrup|dark corn syrup)\b/i,
+    canonical: 'corn syrup',
+    display: 'Corn syrup',
+  },
+  {
+    pattern: /\b(agave|agave nectar|agave syrup)\b/i,
+    canonical: 'agave',
+    display: 'Agave',
+  },
+  {
+    pattern:
+      /\b(oats|rolled oats|old[- ]?fashioned oats|quick oats|steel[- ]?cut oats|instant oats)\b/i,
+    canonical: 'oats',
+    display: 'Oats',
+  },
+  {
+    pattern: /\b(cornmeal|yellow cornmeal|white cornmeal|polenta)\b/i,
+    canonical: 'cornmeal',
+    display: 'Cornmeal',
+  },
+  {
+    pattern: /\b(almond flour|almond meal)\b/i,
+    canonical: 'almond flour',
+    display: 'Almond flour',
+  },
+  {
+    pattern: /\b(coconut flour)\b/i,
+    canonical: 'coconut flour',
+    display: 'Coconut flour',
+  },
+  {
+    pattern: /\b(tapioca|tapioca starch|tapioca flour)\b/i,
+    canonical: 'tapioca',
+    display: 'Tapioca',
+  },
+  {
+    pattern: /\b(arrowroot|arrowroot powder|arrowroot starch)\b/i,
+    canonical: 'arrowroot',
+    display: 'Arrowroot',
+  },
+
+  // Tofu and plant proteins
+  {
+    pattern: /\b(tofu|firm tofu|extra[- ]?firm tofu|silken tofu|soft tofu)\b/i,
+    canonical: 'tofu',
+    display: 'Tofu',
+  },
+  {
+    pattern: /\b(tempeh)\b/i,
+    canonical: 'tempeh',
+    display: 'Tempeh',
+  },
+  {
+    pattern: /\b(seitan)\b/i,
+    canonical: 'seitan',
+    display: 'Seitan',
+  },
+  {
+    pattern: /\b(edamame)\b/i,
+    canonical: 'edamame',
+    display: 'Edamame',
+  },
+
+  // Tortillas and wraps
+  {
+    pattern: /\b(flour tortilla|soft tortilla|burrito tortilla)\b/i,
+    canonical: 'flour tortilla',
+    display: 'Flour tortilla',
+  },
+  {
+    pattern: /\b(corn tortilla|white corn tortilla|yellow corn tortilla)\b/i,
+    canonical: 'corn tortilla',
+    display: 'Corn tortilla',
+  },
+  {
+    pattern: /\b(pita|pita bread|pita pocket)\b/i,
+    canonical: 'pita bread',
+    display: 'Pita bread',
+  },
+  {
+    pattern: /\b(naan|naan bread)\b/i,
+    canonical: 'naan',
+    display: 'Naan',
+  },
+  {
+    pattern: /\b(tortilla chip|corn chip)\b/i,
+    canonical: 'tortilla chips',
+    display: 'Tortilla chips',
+  },
+
+  // Noodles and Asian starches
+  {
+    pattern: /\b(rice noodle|rice vermicelli|pad thai noodle|pho noodle)\b/i,
+    canonical: 'rice noodles',
+    display: 'Rice noodles',
+  },
+  {
+    pattern: /\b(soba noodle|buckwheat noodle)\b/i,
+    canonical: 'soba noodles',
+    display: 'Soba noodles',
+  },
+  {
+    pattern: /\b(udon|udon noodle)\b/i,
+    canonical: 'udon noodles',
+    display: 'Udon noodles',
+  },
+  {
+    pattern: /\b(ramen noodle|ramen)\b/i,
+    canonical: 'ramen noodles',
+    display: 'Ramen noodles',
+  },
+  {
+    pattern: /\b(egg noodle|wide egg noodle|fine egg noodle)\b/i,
+    canonical: 'egg noodles',
+    display: 'Egg noodles',
+  },
+  {
+    pattern: /\b(wonton wrapper|wonton skin|dumpling wrapper)\b/i,
+    canonical: 'wonton wrappers',
+    display: 'Wonton wrappers',
+  },
+  {
+    pattern: /\b(spring roll wrapper|rice paper|rice wrapper)\b/i,
+    canonical: 'rice paper',
+    display: 'Rice paper',
+  },
+
+  // Additional vegetables
+  {
+    pattern: /\b(leek|fresh leek)\b/i,
+    canonical: 'leek',
+    display: 'Leek',
+  },
+  {
+    pattern: /\b(fennel|fennel bulb)\b/i,
+    canonical: 'fennel',
+    display: 'Fennel',
+  },
+  {
+    pattern: /\b(radish|red radish|daikon|daikon radish)\b/i,
+    canonical: 'radish',
+    display: 'Radish',
+  },
+  {
+    pattern: /\b(turnip)\b/i,
+    canonical: 'turnip',
+    display: 'Turnip',
+  },
+  {
+    pattern: /\b(parsnip)\b/i,
+    canonical: 'parsnip',
+    display: 'Parsnip',
+  },
+  {
+    pattern: /\b(rutabaga|swede)\b/i,
+    canonical: 'rutabaga',
+    display: 'Rutabaga',
+  },
+  {
+    pattern: /\b(beet|beetroot|red beet|golden beet)\b/i,
+    canonical: 'beet',
+    display: 'Beet',
+  },
+  {
+    pattern: /\b(artichoke|artichoke heart|canned artichoke)\b/i,
+    canonical: 'artichoke',
+    display: 'Artichoke',
+  },
+  {
+    pattern: /\b(brussels sprout|brussel sprout)\b/i,
+    canonical: 'brussels sprouts',
+    display: 'Brussels sprouts',
+  },
+  {
+    pattern: /\b(bok choy|pak choi|baby bok choy)\b/i,
+    canonical: 'bok choy',
+    display: 'Bok choy',
+  },
+  {
+    pattern: /\b(swiss chard|rainbow chard|chard)\b/i,
+    canonical: 'swiss chard',
+    display: 'Swiss chard',
+  },
+  {
+    pattern: /\b(collard green|collards)\b/i,
+    canonical: 'collard greens',
+    display: 'Collard greens',
+  },
+  {
+    pattern: /\b(watercress)\b/i,
+    canonical: 'watercress',
+    display: 'Watercress',
+  },
+  {
+    pattern: /\b(endive|belgian endive)\b/i,
+    canonical: 'endive',
+    display: 'Endive',
+  },
+  {
+    pattern: /\b(radicchio)\b/i,
+    canonical: 'radicchio',
+    display: 'Radicchio',
+  },
+  {
+    pattern: /\b(okra)\b/i,
+    canonical: 'okra',
+    display: 'Okra',
+  },
+  {
+    pattern: /\b(jicama)\b/i,
+    canonical: 'jicama',
+    display: 'Jicama',
+  },
+  {
+    pattern: /\b(tomatillo)\b/i,
+    canonical: 'tomatillo',
+    display: 'Tomatillo',
+  },
 ];
 
 /**
- * Strip modifier words from ingredient text to find core ingredient
+ * Strip preparation method modifiers (Tier 1)
+ * These describe how to prepare, not what to buy
  * @param {string} text - Ingredient text (lowercase)
- * @returns {string} Text with modifiers removed
+ * @returns {string} Text with prep modifiers removed
  */
-function stripModifiers(text) {
+function stripPrepModifiers(text) {
   let result = text;
 
-  for (const pattern of MODIFIER_PATTERNS) {
-    // Reset regex lastIndex for global patterns
+  for (const pattern of PREP_MODIFIER_PATTERNS) {
     pattern.lastIndex = 0;
     result = result.replace(pattern, ' ');
   }
 
-  // Clean up multiple spaces and trim
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Strip quality/attribute modifiers (Tier 2)
+ * These describe what kind to buy - strip only if needed
+ * @param {string} text - Ingredient text (lowercase)
+ * @returns {string} Text with quality modifiers removed
+ */
+function stripQualityModifiers(text) {
+  let result = text;
+
+  for (const pattern of QUALITY_MODIFIER_PATTERNS) {
+    pattern.lastIndex = 0;
+    result = result.replace(pattern, ' ');
+  }
+
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Strip all modifier words from ingredient text to find core ingredient
+ * @param {string} text - Ingredient text (lowercase)
+ * @param {Object} [options] - Options for stripping
+ * @param {boolean} [options.prepOnly=false] - Only strip prep modifiers (Tier 1)
+ * @param {boolean} [options.qualityOnly=false] - Only strip quality modifiers (Tier 2)
+ * @returns {string} Text with modifiers removed
+ */
+function stripModifiers(text, options = {}) {
+  const { prepOnly = false, qualityOnly = false } = options;
+
+  let result = text;
+
+  // Apply tier 1 (prep modifiers) unless only quality is requested
+  if (!qualityOnly) {
+    result = stripPrepModifiers(result);
+  }
+
+  // Apply tier 2 (quality modifiers) unless only prep is requested
+  if (!prepOnly) {
+    result = stripQualityModifiers(result);
+  }
+
   return result.replace(/\s+/g, ' ').trim();
 }
 
@@ -1089,20 +1716,35 @@ function normalizeIngredientName(nameOrText) {
     };
   }
 
-  // Step 6: Strip modifiers and try family match again
-  const stripped = stripModifiers(lower);
-  if (stripped !== lower && stripped.length > 0) {
-    const strippedFamilyMatch = matchIngredientFamily(stripped);
-    if (strippedFamilyMatch) {
+  // Step 6: TIERED MODIFIER STRIPPING
+  // First, try stripping only prep modifiers (Tier 1)
+  // This preserves quality descriptors like "organic" or "fresh"
+  const prepStripped = stripPrepModifiers(lower);
+  if (prepStripped !== lower && prepStripped.length > 0) {
+    const prepStrippedMatch = matchIngredientFamily(prepStripped);
+    if (prepStrippedMatch) {
       return {
-        canonicalKey: strippedFamilyMatch.canonical,
-        displayName: strippedFamilyMatch.display,
-        attributes: { familyMatched: true, modifiersStripped: true },
+        canonicalKey: prepStrippedMatch.canonical,
+        displayName: prepStrippedMatch.display,
+        attributes: { familyMatched: true, prepModifiersStripped: true },
       };
     }
   }
 
-  // Step 7: "and" → "&" normalization for short ingredient conjunctions
+  // Step 7: If still no match, strip all modifiers (Tier 1 + 2)
+  const fullyStripped = stripModifiers(lower);
+  if (fullyStripped !== lower && fullyStripped.length > 0) {
+    const fullyStrippedMatch = matchIngredientFamily(fullyStripped);
+    if (fullyStrippedMatch) {
+      return {
+        canonicalKey: fullyStrippedMatch.canonical,
+        displayName: fullyStrippedMatch.display,
+        attributes: { familyMatched: true, allModifiersStripped: true },
+      };
+    }
+  }
+
+  // Step 8: "and" → "&" normalization for short ingredient conjunctions
   // Only apply to patterns like "X and Y" where X and Y are short words
   const andPattern = /^(\w{2,12})\s+and\s+(\w{2,12})$/i;
   const andMatch = lower.match(andPattern);
@@ -1115,16 +1757,30 @@ function normalizeIngredientName(nameOrText) {
     };
   }
 
-  // Step 8: Standard normalization on stripped text
+  // Step 9: Standard normalization on stripped text
   // - Singularize common plurals
   // - Normalize spacing
-  const textToSingularize = stripped.length > 0 ? stripped : lower;
+  // Prefer prep-stripped text over fully-stripped to preserve quality descriptors
+  const textToSingularize =
+    prepStripped.length > 0 && prepStripped !== lower
+      ? prepStripped
+      : fullyStripped.length > 0
+        ? fullyStripped
+        : lower;
   const singularized = singularize(textToSingularize);
+
+  // Determine what was stripped for attributes
+  let strippingInfo = {};
+  if (textToSingularize === prepStripped && prepStripped !== lower) {
+    strippingInfo = { prepModifiersStripped: true };
+  } else if (textToSingularize === fullyStripped && fullyStripped !== lower) {
+    strippingInfo = { allModifiersStripped: true };
+  }
 
   return {
     canonicalKey: singularized,
     displayName: capitalizeFirst(singularized),
-    attributes: stripped !== lower ? { modifiersStripped: true } : {},
+    attributes: strippingInfo,
   };
 }
 
@@ -1173,7 +1829,7 @@ function detectBellPepper(lower) {
  * @returns {string} Singularized word
  */
 function singularize(word) {
-  // Special cases
+  // Special cases - irregular plurals common in recipes
   const irregulars = {
     tomatoes: 'tomato',
     potatoes: 'potato',
@@ -1182,10 +1838,43 @@ function singularize(word) {
     loaves: 'loaf',
     knives: 'knife',
     shelves: 'shelf',
+    // Additional irregular plurals
+    anchovies: 'anchovy',
+    berries: 'berry',
+    cherries: 'cherry',
+    raspberries: 'raspberry',
+    blueberries: 'blueberry',
+    blackberries: 'blackberry',
+    strawberries: 'strawberry',
+    cranberries: 'cranberry',
+    mangoes: 'mango',
+    avocados: 'avocado',
+    // Keep some plurals as-is (they're typically sold/used in plural form)
+    // oats: 'oats',  // Oats is usually plural
+    // lentils: 'lentils',  // Lentils is usually plural
   };
 
   if (irregulars[word]) {
     return irregulars[word];
+  }
+
+  // Words that should stay plural (common in recipes)
+  const keepPlural = new Set([
+    'oats',
+    'lentils',
+    'chickpeas',
+    'breadcrumbs',
+    'peas',
+    'greens',
+    'grits',
+    'noodles',
+    'sprouts',
+    'flakes',
+    'grains',
+  ]);
+
+  if (keepPlural.has(word)) {
+    return word;
   }
 
   // Common patterns
@@ -1200,6 +1889,11 @@ function singularize(word) {
       word.endsWith('xes') ||
       word.endsWith('sses'))
   ) {
+    return word.slice(0, -2);
+  }
+
+  // Handle -oes endings (potatoes, tomatoes handled above, but catch others)
+  if (word.endsWith('oes') && word.length > 4) {
     return word.slice(0, -2);
   }
 
@@ -1374,6 +2068,7 @@ function processGroup(group) {
 
 /**
  * Process bell pepper group with color breakdown
+ * Improved handling for unspecified variants
  */
 function processBellPepperGroup(canonicalKey, displayName, items, sourceLines) {
   // Group by color
@@ -1403,28 +2098,39 @@ function processBellPepperGroup(canonicalKey, displayName, items, sourceLines) {
     }
   }
 
-  // Build components array
+  // Build components array with improved unspecified handling
   const components = [];
-  for (const [color, data] of colorGroups) {
-    if (color !== 'unspecified' || colorGroups.size === 1) {
-      components.push({
-        label: color,
-        quantity: data.quantity || data.count,
-        unit: null,
-      });
-    }
+  const colorOrder = ['red', 'green', 'yellow', 'orange', 'unspecified'];
+
+  // Sort colors in a logical order
+  const sortedColors = [...colorGroups.keys()].sort((a, b) => {
+    const indexA = colorOrder.indexOf(a);
+    const indexB = colorOrder.indexOf(b);
+    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+  });
+
+  for (const color of sortedColors) {
+    const data = colorGroups.get(color);
+    // Include unspecified variants with a friendlier label
+    const label = color === 'unspecified' ? 'any color' : color;
+    components.push({
+      label,
+      quantity: data.quantity || data.count,
+      unit: null,
+    });
   }
 
-  // Build notes string
+  // Build notes string - always show breakdown if we have colored variants
   let notes = null;
-  if (components.length > 1 || (components.length === 1 && components[0].label !== 'unspecified')) {
-    const breakdown = components
-      .filter((c) => c.label !== 'unspecified')
-      .map((c) => `${c.quantity} ${c.label}`)
-      .join(', ');
-    if (breakdown) {
-      notes = `Breakdown: ${breakdown}`;
+  const coloredComponents = components.filter((c) => c.label !== 'any color');
+  const unspecifiedComponent = components.find((c) => c.label === 'any color');
+
+  if (coloredComponents.length > 0) {
+    const breakdownParts = coloredComponents.map((c) => `${c.quantity} ${c.label}`);
+    if (unspecifiedComponent) {
+      breakdownParts.push(`${unspecifiedComponent.quantity} any color`);
     }
+    notes = `Breakdown: ${breakdownParts.join(', ')}`;
   }
 
   return {
@@ -1568,9 +2274,13 @@ module.exports = {
   singularize,
   detectBellPepper,
   stripModifiers,
+  stripPrepModifiers,
+  stripQualityModifiers,
   matchIngredientFamily,
   COMPOUND_NORMALIZATIONS,
   UNIT_CONVERSION,
   MODIFIER_PATTERNS,
+  PREP_MODIFIER_PATTERNS,
+  QUALITY_MODIFIER_PATTERNS,
   INGREDIENT_FAMILY_MAP,
 };

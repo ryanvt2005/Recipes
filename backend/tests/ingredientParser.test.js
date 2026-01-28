@@ -202,18 +202,37 @@ describe('parseIngredientString', () => {
   });
 
   describe('unitless ingredients', () => {
-    test('parses count ingredients', () => {
+    test('parses count ingredients with inferred unit', () => {
+      // Phase 1 improvement: countable ingredients now infer "piece" unit
       const result = parseIngredientString('2 eggs');
       expect(result.quantity).toBe(2);
-      expect(result.unit).toBeNull();
+      expect(result.unit).toBe('piece'); // Inferred for countable items
       expect(result.ingredient).toBe('eggs');
     });
 
-    test('parses ingredients without quantity', () => {
+    test('parses non-countable ingredients without unit', () => {
+      // Items not in COUNTABLE_INGREDIENTS still have no unit
+      const result = parseIngredientString('2 cups flour');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('flour');
+    });
+
+    test('parses "to taste" ingredients', () => {
+      // Phase 1 improvement: "to taste" patterns are now detected
       const result = parseIngredientString('salt to taste');
       expect(result.quantity).toBeNull();
       expect(result.unit).toBeNull();
-      expect(result.ingredient).toBe('salt to taste');
+      expect(result.ingredient).toBe('salt');
+      expect(result.notes).toBe('to taste');
+    });
+
+    test('parses "as needed" ingredients', () => {
+      const result = parseIngredientString('olive oil as needed');
+      expect(result.quantity).toBeNull();
+      expect(result.unit).toBeNull();
+      expect(result.ingredient).toBe('olive oil');
+      expect(result.notes).toBe('as needed');
     });
   });
 
