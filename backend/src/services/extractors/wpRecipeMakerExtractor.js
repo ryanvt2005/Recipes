@@ -51,7 +51,9 @@ function extractTitle($) {
 
   for (const selector of selectors) {
     const text = $(selector).first().text().trim();
-    if (text) {return text;}
+    if (text) {
+      return text;
+    }
   }
 
   return null;
@@ -63,11 +65,17 @@ function extractTitle($) {
  * @returns {string|null}
  */
 function extractDescription($) {
-  const selectors = ['.wprm-recipe-summary', '.wprm-recipe-description', '[class*="wprm-recipe-summary"]'];
+  const selectors = [
+    '.wprm-recipe-summary',
+    '.wprm-recipe-description',
+    '[class*="wprm-recipe-summary"]',
+  ];
 
   for (const selector of selectors) {
     const text = $(selector).first().text().trim();
-    if (text) {return text;}
+    if (text) {
+      return text;
+    }
   }
 
   return null;
@@ -134,7 +142,9 @@ function extractImage($) {
  * @returns {string|null}
  */
 function extractTime($, timeType) {
-  const container = $(`.wprm-recipe-${timeType}-time-container, .wprm-recipe-${timeType}_time-container`).first();
+  const container = $(
+    `.wprm-recipe-${timeType}-time-container, .wprm-recipe-${timeType}_time-container`
+  ).first();
 
   if (container.length === 0) {
     // Try alternative: look for time in details section
@@ -177,7 +187,10 @@ function extractServings($) {
   for (const selector of selectors) {
     const container = $(selector).first();
     // Get the servings number
-    const servingsNum = container.find('.wprm-recipe-servings-amount, .wprm-recipe-servings-number').text().trim();
+    const servingsNum = container
+      .find('.wprm-recipe-servings-amount, .wprm-recipe-servings-number')
+      .text()
+      .trim();
     if (servingsNum) {
       return servingsNum;
     }
@@ -185,7 +198,9 @@ function extractServings($) {
     const text = container.text().trim();
     if (text) {
       const match = text.match(/(\d+)/);
-      if (match) {return match[1];}
+      if (match) {
+        return match[1];
+      }
     }
   }
 
@@ -251,10 +266,18 @@ function parseIngredientElement($, elem, sortOrder, group) {
 
   // Build raw text
   let rawText = '';
-  if (amount) {rawText += amount + ' ';}
-  if (unit) {rawText += unit + ' ';}
-  if (name) {rawText += name;}
-  if (notes) {rawText += ', ' + notes;}
+  if (amount) {
+    rawText += amount + ' ';
+  }
+  if (unit) {
+    rawText += unit + ' ';
+  }
+  if (name) {
+    rawText += name;
+  }
+  if (notes) {
+    rawText += ', ' + notes;
+  }
   rawText = rawText.trim();
 
   // Fallback to full text if structured parsing failed
@@ -262,7 +285,9 @@ function parseIngredientElement($, elem, sortOrder, group) {
     rawText = $elem.text().trim();
   }
 
-  if (!rawText) {return null;}
+  if (!rawText) {
+    return null;
+  }
 
   // Use the ingredient parser for consistent parsing
   const parsed = parseIngredientString(rawText, sortOrder);
