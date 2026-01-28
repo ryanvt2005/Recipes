@@ -289,7 +289,113 @@ function parseIngredientString(rawText, sortOrder = 0) {
 }
 
 /**
+ * Parse recipeYield into a clean servings string
+ * Handles arrays, numbers, and various string formats
+ *
+ * Examples:
+ *   ["4", "4 servings"] → "4"
+ *   "4 servings" → "4"
+ *   "Makes 12 cookies" → "12"
+ *   4 → "4"
+ *   "4-6 servings" → "4-6"
+ *   "6 to 8" → "6-8"
+ */
+function parseServings(recipeYield) {
+  if (recipeYield === null || recipeYield === undefined) return null;
+
+  let raw;
+
+  // Handle arrays - pick the shortest numeric entry (usually just the number)
+  if (Array.isArray(recipeYield)) {
+    // Find the first entry that is just a number
+    const numericEntry = recipeYield.find((entry) => /^\d+$/.test(String(entry).trim()));
+    if (numericEntry) return String(numericEntry);
+
+    // Otherwise use the first entry
+    raw = String(recipeYield[0]);
+  } else {
+    raw = String(recipeYield);
+  }
+
+  raw = raw.trim();
+
+  // Already a clean number
+  if (/^\d+$/.test(raw)) return raw;
+
+  // Range: "4-6 servings" or "4 - 6"
+  const rangeMatch = raw.match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (rangeMatch) return `${rangeMatch[1]}-${rangeMatch[2]}`;
+
+  // Range with "to": "6 to 8 servings"
+  const toRangeMatch = raw.match(/(\d+)\s+to\s+(\d+)/i);
+  if (toRangeMatch) return `${toRangeMatch[1]}-${toRangeMatch[2]}`;
+
+  // Extract first number from string like "4 servings", "Makes 12 cookies"
+  const numberMatch = raw.match(/(\d+)/);
+  if (numberMatch) return numberMatch[1];
+
+  // Return as-is if we can't parse (e.g., "a dozen")
+  return raw;
+}
+
+/**
+ * Check if an item is a Recipe type
+ */
+function isRecipeType(item) {
+  if (!item || typeof item !== 'object') return false;
+  const type = item['@type'];
+  if (type === 'Recipe') return true;
+  if (Array.isArray(type) && type.includes('Recipe')) return true;
+  return false;
+}
+
+/**
+ * Resolve an @id reference within a @graph array
+ */
+function resolveIdReference(ref, graph) {
+  if (!ref || !graph || !Array.isArray(graph)) return null;
+
+  // If it's a string @id reference
+  const id = typeof ref === 'string' ? ref : ref['@id'];
+  if (!id) return ref; // Return as-is if no @id
+
+  // Find the referenced object in the graph
+  const resolved = graph.find((item) => item['@id'] === id);
+  return resolved || ref;
+}
+
+/**
+ * Extract author name from schema.org author field
+ * Handles direct values, objects, arrays, and @id references
+ */
+function extractAuthorName(authorField, graph) {
+  if (!authorField) return null;
+
+  // Direct string
+  if (typeof authorField === 'string') return authorField;
+
+  // Array of authors - take first one
+  if (Array.isArray(authorField)) {
+    const first = authorField[0];
+    if (typeof first === 'string') return first;
+    // Resolve if it's a reference
+    const resolved = resolveIdReference(first, graph);
+    return resolved?.name || null;
+  }
+
+  // Object with @id reference - resolve it
+  if (authorField['@id']) {
+    const resolved = resolveIdReference(authorField, graph);
+    return resolved?.name || null;
+  }
+
+  // Direct object with name
+  return authorField.name || null;
+}
+
+/**
  * Extract recipe from schema.org JSON-LD
+ * Supports both direct Recipe objects and @graph structures
  */
 function extractRecipeFromSchema(html) {
   const $ = cheerio.load(html);
@@ -298,13 +404,26 @@ function extractRecipeFromSchema(html) {
   for (let i = 0; i < scripts.length; i++) {
     try {
       const jsonLd = JSON.parse($(scripts[i]).html());
-      const recipes = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
 
-      const recipeData = recipes.find(
-        (item) =>
-          item['@type'] === 'Recipe' ||
-          (Array.isArray(item['@type']) && item['@type'].includes('Recipe'))
-      );
+      let candidates = [];
+      let graph = null;
+
+      // Handle @graph structure (used by many sites including WP Recipe Maker)
+      if (jsonLd['@graph'] && Array.isArray(jsonLd['@graph'])) {
+        graph = jsonLd['@graph'];
+        candidates = graph;
+      }
+      // Handle array of objects
+      else if (Array.isArray(jsonLd)) {
+        candidates = jsonLd;
+      }
+      // Handle single object
+      else {
+        candidates = [jsonLd];
+      }
+
+      // Find the Recipe object
+      const recipeData = candidates.find(isRecipeType);
 
       if (!recipeData) {
         continue;
@@ -316,11 +435,15 @@ function extractRecipeFromSchema(html) {
         continue;
       }
 
+      // Extract author with @id resolution
+      const author = extractAuthorName(recipeData.author, graph);
+
       const recipe = {
         title: recipeData.name,
         description: recipeData.description || null,
+        author: author,
         imageUrl: extractImageUrl(recipeData.image),
-        servings: recipeData.recipeYield || null,
+        servings: parseServings(recipeData.recipeYield),
         prepTime: parseDuration(recipeData.prepTime),
         cookTime: parseDuration(recipeData.cookTime),
         totalTime: parseDuration(recipeData.totalTime),
@@ -330,7 +453,11 @@ function extractRecipeFromSchema(html) {
 
       // Final validation
       if (recipe.ingredients.length > 0 && recipe.instructions.length > 0) {
-        logger.info('Successfully extracted recipe from schema.org');
+        logger.info('Successfully extracted recipe from schema.org', {
+          title: recipe.title,
+          author: recipe.author,
+          ingredientCount: recipe.ingredients.length,
+        });
         return recipe;
       }
     } catch (error) {
@@ -492,6 +619,11 @@ async function extractRecipe(url) {
     logger.info('Schema extraction failed, falling back to LLM');
     recipe = await extractRecipeWithLLM(html);
     extractionMethod = 'llm';
+
+    // Normalize servings from LLM output
+    if (recipe.servings) {
+      recipe.servings = parseServings(recipe.servings);
+    }
   }
 
   // Add source URL and extraction method
