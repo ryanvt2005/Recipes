@@ -297,7 +297,9 @@ export default function AddRecipePage() {
                     </div>
                     {extractionMeta.quality && (
                       <div className="text-sm text-gray-600">
-                        <span className="font-medium">Quality: {extractionMeta.quality.score}%</span>
+                        <span className="font-medium">
+                          Quality: {extractionMeta.quality.score}%
+                        </span>
                         {extractionMeta.quality.missing?.length > 0 && (
                           <span className="ml-2">
                             Missing: {extractionMeta.quality.missing.join(', ')}
