@@ -353,7 +353,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
  *   "6 to 8" → "6-8"
  */
 function parseServings(recipeYield) {
-  if (recipeYield === null || recipeYield === undefined) return null;
+  if (recipeYield === null || recipeYield === undefined) {return null;}
 
   let raw;
 
@@ -361,7 +361,7 @@ function parseServings(recipeYield) {
   if (Array.isArray(recipeYield)) {
     // Find the first entry that is just a number
     const numericEntry = recipeYield.find((entry) => /^\d+$/.test(String(entry).trim()));
-    if (numericEntry) return String(numericEntry);
+    if (numericEntry) {return String(numericEntry);}
 
     // Otherwise use the first entry
     raw = String(recipeYield[0]);
@@ -372,19 +372,19 @@ function parseServings(recipeYield) {
   raw = raw.trim();
 
   // Already a clean number
-  if (/^\d+$/.test(raw)) return raw;
+  if (/^\d+$/.test(raw)) {return raw;}
 
   // Range: "4-6 servings" or "4 - 6"
   const rangeMatch = raw.match(/(\d+)\s*[-–]\s*(\d+)/);
-  if (rangeMatch) return `${rangeMatch[1]}-${rangeMatch[2]}`;
+  if (rangeMatch) {return `${rangeMatch[1]}-${rangeMatch[2]}`;}
 
   // Range with "to": "6 to 8 servings"
   const toRangeMatch = raw.match(/(\d+)\s+to\s+(\d+)/i);
-  if (toRangeMatch) return `${toRangeMatch[1]}-${toRangeMatch[2]}`;
+  if (toRangeMatch) {return `${toRangeMatch[1]}-${toRangeMatch[2]}`;}
 
   // Extract first number from string like "4 servings", "Makes 12 cookies"
   const numberMatch = raw.match(/(\d+)/);
-  if (numberMatch) return numberMatch[1];
+  if (numberMatch) {return numberMatch[1];}
 
   // Return as-is if we can't parse (e.g., "a dozen")
   return raw;
@@ -394,10 +394,10 @@ function parseServings(recipeYield) {
  * Check if an item is a Recipe type
  */
 function isRecipeType(item) {
-  if (!item || typeof item !== 'object') return false;
+  if (!item || typeof item !== 'object') {return false;}
   const type = item['@type'];
-  if (type === 'Recipe') return true;
-  if (Array.isArray(type) && type.includes('Recipe')) return true;
+  if (type === 'Recipe') {return true;}
+  if (Array.isArray(type) && type.includes('Recipe')) {return true;}
   return false;
 }
 
@@ -405,11 +405,11 @@ function isRecipeType(item) {
  * Resolve an @id reference within a @graph array
  */
 function resolveIdReference(ref, graph) {
-  if (!ref || !graph || !Array.isArray(graph)) return null;
+  if (!ref || !graph || !Array.isArray(graph)) {return null;}
 
   // If it's a string @id reference
   const id = typeof ref === 'string' ? ref : ref['@id'];
-  if (!id) return ref; // Return as-is if no @id
+  if (!id) {return ref;} // Return as-is if no @id
 
   // Find the referenced object in the graph
   const resolved = graph.find((item) => item['@id'] === id);
@@ -421,15 +421,15 @@ function resolveIdReference(ref, graph) {
  * Handles direct values, objects, arrays, and @id references
  */
 function extractAuthorName(authorField, graph) {
-  if (!authorField) return null;
+  if (!authorField) {return null;}
 
   // Direct string
-  if (typeof authorField === 'string') return authorField;
+  if (typeof authorField === 'string') {return authorField;}
 
   // Array of authors - take first one
   if (Array.isArray(authorField)) {
     const first = authorField[0];
-    if (typeof first === 'string') return first;
+    if (typeof first === 'string') {return first;}
     // Resolve if it's a reference
     const resolved = resolveIdReference(first, graph);
     return resolved?.name || null;
