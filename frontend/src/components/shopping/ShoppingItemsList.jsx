@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { TrashIcon } from '@heroicons/react/24/outline';
 import { getCategoryList } from '../../core';
 
 // Get categories in display order from core module
@@ -8,6 +9,7 @@ export default function ShoppingItemsList({
   items,
   onToggleItem,
   onUpdateCategory,
+  onDeleteItem,
   formatQuantity,
   isMobile = false,
 }) {
@@ -124,6 +126,16 @@ export default function ShoppingItemsList({
                           {item.quantity || item.unit
                             ? `${formatQuantity(item.quantity, item.unit)} ${item.ingredient_name}`
                             : item.ingredient_name}
+                          {/* Show "to taste" or similar inline for quantity-less items */}
+                          {!item.quantity && !item.unit && item.notes && (
+                            <span
+                              className={`ml-2 text-sm font-normal italic ${
+                                item.is_checked ? 'text-gray-400' : 'text-gray-500'
+                              }`}
+                            >
+                              ({item.notes})
+                            </span>
+                          )}
                         </div>
                         {/* Component breakdown for aggregated items (e.g., bell pepper colors) */}
                         {item.components && item.components.length > 0 && (
@@ -143,8 +155,8 @@ export default function ShoppingItemsList({
                             ))}
                           </div>
                         )}
-                        {/* Notes - show breakdown text or custom notes */}
-                        {item.notes && (
+                        {/* Notes - show breakdown text (only if not already shown inline) */}
+                        {item.notes && (item.quantity || item.unit) && (
                           <div
                             className={`text-sm mt-1 ${
                               item.is_checked ? 'text-gray-400' : 'text-gray-500'
@@ -172,6 +184,18 @@ export default function ShoppingItemsList({
                           ))}
                         </select>
                       )}
+                      {/* Delete button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteItem(item.id, item.ingredient_name);
+                        }}
+                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors no-print self-center"
+                        title="Delete item"
+                      >
+                        <TrashIcon className="w-5 h-5" />
+                      </button>
                     </button>
                   ))}
                 </div>

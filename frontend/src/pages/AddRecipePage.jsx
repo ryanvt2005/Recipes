@@ -1,10 +1,19 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { recipes } from '../services/api';
 import Layout from '../components/Layout';
 import Input from '../components/Input';
 import Button from '../components/Button';
 import LoadingSpinner from '../components/LoadingSpinner';
+
+// Extraction status messages to cycle through during loading
+const EXTRACTION_MESSAGES = [
+  'Fetching recipe page...',
+  'Looking for recipe data...',
+  'Parsing ingredients...',
+  'Extracting instructions...',
+  'Almost there...',
+];
 
 export default function AddRecipePage() {
   const [mode, setMode] = useState('extract'); // 'extract' or 'manual'
@@ -13,12 +22,16 @@ export default function AddRecipePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [extractedRecipe, setExtractedRecipe] = useState(null);
+  const [extractionStatus, setExtractionStatus] = useState('');
+  const [extractionMeta, setExtractionMeta] = useState(null); // Stores quality score, method, cached
 
   const navigate = useNavigate();
+  const statusIntervalRef = useRef(null);
 
   const handleStartManual = () => {
     setExtractedRecipe({
       title: '',
+      author: '',
       description: '',
       prepTime: '',
       cookTime: '',
@@ -27,6 +40,7 @@ export default function AddRecipePage() {
       ingredients: [{ rawText: '', ingredient: '' }],
       instructions: [''],
     });
+    setExtractionMeta(null); // Clear any previous extraction metadata
     setMode('manual');
   };
 
@@ -34,6 +48,15 @@ export default function AddRecipePage() {
     e.preventDefault();
     setError('');
     setExtracting(true);
+    setExtractionStatus(EXTRACTION_MESSAGES[0]);
+    setExtractionMeta(null);
+
+    // Cycle through status messages during extraction
+    let messageIndex = 0;
+    statusIntervalRef.current = setInterval(() => {
+      messageIndex = (messageIndex + 1) % EXTRACTION_MESSAGES.length;
+      setExtractionStatus(EXTRACTION_MESSAGES[messageIndex]);
+    }, 2000);
 
     try {
       const response = await recipes.extract(url);
@@ -44,13 +67,35 @@ export default function AddRecipePage() {
         recipe.servings = recipe.servings[recipe.servings.length - 1];
       }
 
+      // Store extraction metadata separately (quality score, method, cached)
+      setExtractionMeta({
+        method: recipe.extractionMethod || 'unknown',
+        cached: recipe.cached || false,
+        quality: recipe.extractionQuality || null,
+        sourceUrl: recipe.sourceUrl || url,
+      });
+
       setExtractedRecipe(recipe);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to extract recipe from URL');
     } finally {
+      if (statusIntervalRef.current) {
+        clearInterval(statusIntervalRef.current);
+        statusIntervalRef.current = null;
+      }
       setExtracting(false);
+      setExtractionStatus('');
     }
   };
+
+  // Cleanup interval on unmount
+  useEffect(() => {
+    return () => {
+      if (statusIntervalRef.current) {
+        clearInterval(statusIntervalRef.current);
+      }
+    };
+  }, []);
 
   const handleSave = async () => {
     setSaving(true);
@@ -81,6 +126,7 @@ export default function AddRecipePage() {
       // Remove fields that aren't allowed by backend validation
       delete recipeData.cached;
       delete recipeData.extractionMethod;
+      delete recipeData.extractionQuality;
 
       const response = await recipes.create(recipeData);
       navigate(`/recipes/${response.data.recipe.id}`);
@@ -202,8 +248,8 @@ export default function AddRecipePage() {
             {extracting && (
               <div className="mt-6 text-center">
                 <LoadingSpinner />
-                <p className="mt-2 text-sm text-gray-600">
-                  Analyzing recipe... This may take a few seconds
+                <p className="mt-2 text-sm text-gray-600 font-medium">
+                  {extractionStatus || 'Analyzing recipe...'}
                 </p>
               </div>
             )}
@@ -213,10 +259,72 @@ export default function AddRecipePage() {
         {/* Extracted Recipe Edit */}
         {extractedRecipe && (
           <div className="space-y-6">
+            {/* Extraction Quality Banner */}
+            {extractionMeta && (
+              <div
+                className={`rounded-lg p-4 ${
+                  extractionMeta.quality?.score >= 70
+                    ? 'bg-green-50 border border-green-200'
+                    : extractionMeta.quality?.score >= 50
+                      ? 'bg-yellow-50 border border-yellow-200'
+                      : 'bg-orange-50 border border-orange-200'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-gray-800">
+                        {extractionMeta.quality?.score >= 70
+                          ? 'Extraction Complete'
+                          : extractionMeta.quality?.score >= 50
+                            ? 'Partial Extraction'
+                            : 'Limited Extraction'}
+                      </span>
+                      {extractionMeta.cached && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                          Cached
+                        </span>
+                      )}
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                        {extractionMeta.method === 'schema'
+                          ? 'Schema.org'
+                          : extractionMeta.method === 'wprm'
+                            ? 'WP Recipe Maker'
+                            : extractionMeta.method === 'llm'
+                              ? 'AI Extraction'
+                              : 'Unknown'}
+                      </span>
+                    </div>
+                    {extractionMeta.quality && (
+                      <div className="text-sm text-gray-600">
+                        <span className="font-medium">Quality: {extractionMeta.quality.score}%</span>
+                        {extractionMeta.quality.missing?.length > 0 && (
+                          <span className="ml-2">
+                            Missing: {extractionMeta.quality.missing.join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {extractionMeta.quality?.score < 70 && (
+                    <p className="text-xs text-gray-500 max-w-[200px] text-right">
+                      Please fill in the missing fields below
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="card">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-semibold">Edit Recipe</h2>
-                <Button variant="secondary" onClick={() => setExtractedRecipe(null)}>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setExtractedRecipe(null);
+                    setExtractionMeta(null);
+                  }}
+                >
                   Start Over
                 </Button>
               </div>
@@ -227,6 +335,13 @@ export default function AddRecipePage() {
                   value={extractedRecipe.title || ''}
                   onChange={(e) => handleFieldChange('title', e.target.value)}
                   required
+                />
+
+                <Input
+                  label="Author"
+                  value={extractedRecipe.author || ''}
+                  onChange={(e) => handleFieldChange('author', e.target.value)}
+                  placeholder="Recipe author or source"
                 />
 
                 <div>

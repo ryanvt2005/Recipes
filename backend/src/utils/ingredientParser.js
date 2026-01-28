@@ -151,6 +151,58 @@ const UNIT_MAP = {
 };
 
 /**
+ * Patterns indicating "to taste" or optional quantities
+ * These ingredients should have null quantity but preserve the phrase
+ */
+const TO_TASTE_PATTERNS = [
+  /\bto\s+taste\b/i,
+  /\bas\s+needed\b/i,
+  /\bto\s+your\s+(liking|preference)\b/i,
+  /\boptional\b/i,
+  /\bfor\s+garnish\b/i,
+  /\bfor\s+serving\b/i,
+];
+
+/**
+ * Common countable ingredients that should infer "piece" unit when unitless
+ */
+const COUNTABLE_INGREDIENTS = new Set([
+  'egg',
+  'eggs',
+  'banana',
+  'bananas',
+  'apple',
+  'apples',
+  'orange',
+  'oranges',
+  'lemon',
+  'lemons',
+  'lime',
+  'limes',
+  'onion',
+  'onions',
+  'potato',
+  'potatoes',
+  'tomato',
+  'tomatoes',
+  'carrot',
+  'carrots',
+  'avocado',
+  'avocados',
+  'cucumber',
+  'cucumbers',
+  'zucchini',
+  'bell pepper',
+  'bell peppers',
+  'jalapeño',
+  'jalapeños',
+  'jalapeno',
+  'jalapenos',
+  'shallot',
+  'shallots',
+]);
+
+/**
  * Words that are NOT units but might look like them
  * These should be treated as part of the ingredient name
  */
@@ -247,11 +299,17 @@ function parseQuantity(quantityStr) {
 
   let str = String(quantityStr).trim();
 
+  // Normalize spacing around Unicode fractions (handle "1 ½" and "1½" consistently)
+  for (const frac of Object.keys(UNICODE_FRACTIONS)) {
+    // Normalize "1 ½" to "1½" for consistent parsing
+    str = str.replace(new RegExp(`(\\d+)\\s+${frac}`, 'g'), `$1${frac}`);
+  }
+
   // Replace Unicode fractions with decimals
   for (const [frac, decimal] of Object.entries(UNICODE_FRACTIONS)) {
     if (str.includes(frac)) {
-      // Handle mixed numbers like "1½" or "1 ½"
-      const mixedMatch = str.match(new RegExp(`(\\d+)\\s*${frac}`));
+      // Handle mixed numbers like "1½"
+      const mixedMatch = str.match(new RegExp(`(\\d+)${frac}`));
       if (mixedMatch) {
         return parseInt(mixedMatch[1], 10) + decimal;
       }
@@ -314,6 +372,48 @@ function parseIngredientString(rawText, sortOrder = 0) {
   }
 
   const original = rawText.trim();
+
+  // Check for "to taste" patterns - these have null quantity
+  let matchedToTastePhrase = null;
+  const toTastePhrasePatterns = [
+    { regex: /\bto\s+taste\b/i, phrase: 'to taste' },
+    { regex: /\bas\s+needed\b/i, phrase: 'as needed' },
+    { regex: /\bto\s+your\s+(liking|preference)\b/i, phrase: 'to taste' },
+    { regex: /\boptional\b/i, phrase: 'optional' },
+    { regex: /\bfor\s+garnish\b/i, phrase: 'for garnish' },
+    { regex: /\bfor\s+serving\b/i, phrase: 'for serving' },
+  ];
+
+  for (const { regex, phrase } of toTastePhrasePatterns) {
+    if (regex.test(original)) {
+      matchedToTastePhrase = phrase;
+      break;
+    }
+  }
+
+  // If "to taste" pattern found, return early with the full text as ingredient
+  if (matchedToTastePhrase) {
+    // Try to extract the ingredient name (remove the "to taste" part for cleaner display)
+    let ingredientName = original
+      .replace(
+        /,?\s*(to\s+taste|as\s+needed|to\s+your\s+(liking|preference)|optional|for\s+garnish|for\s+serving)/gi,
+        ''
+      )
+      .trim();
+    // Remove trailing comma if any
+    ingredientName = ingredientName.replace(/,\s*$/, '').trim();
+
+    return {
+      rawText: original,
+      sortOrder,
+      quantity: null,
+      unit: null,
+      ingredient: ingredientName || original,
+      preparation: null,
+      notes: matchedToTastePhrase,
+      group: null,
+    };
+  }
 
   // First, try to split by comma for preparation notes
   // e.g., "2 cups flour, sifted" → ingredient: "flour", preparation: "sifted"
@@ -383,6 +483,14 @@ function parseIngredientString(rawText, sortOrder = 0) {
   // If we still don't have an ingredient name, use the whole original text
   if (!ingredientName) {
     ingredientName = original;
+  }
+
+  // Infer "piece" unit for countable ingredients that have quantity but no unit
+  if (quantity !== null && !unit) {
+    const lowerIngredient = ingredientName.toLowerCase();
+    if (COUNTABLE_INGREDIENTS.has(lowerIngredient)) {
+      unit = 'piece';
+    }
   }
 
   return {
@@ -499,6 +607,21 @@ function decimalToFraction(decimal) {
   return formatQuantityDisplay(decimal);
 }
 
+/**
+ * Safely coerce a value to a number
+ * Handles strings from PostgreSQL, null/undefined, and invalid values
+ *
+ * @param {any} value - Value to coerce
+ * @returns {number|null} Numeric value or null if invalid
+ */
+function toNumber(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+  return isNaN(num) ? null : num;
+}
+
 module.exports = {
   parseIngredientString,
   parseQuantity,
@@ -506,6 +629,9 @@ module.exports = {
   formatIngredientDisplay,
   formatQuantityDisplay,
   decimalToFraction,
+  toNumber,
   UNIT_MAP,
   UNICODE_FRACTIONS,
+  TO_TASTE_PATTERNS,
+  COUNTABLE_INGREDIENTS,
 };
