@@ -132,13 +132,64 @@ async function fetchHtml(url) {
 
     return response.data;
   } catch (error) {
+    const status = error.response?.status;
     logger.error('Failed to fetch URL', {
       url,
       error: error.message,
-      status: error.response?.status,
+      status,
     });
+
+    // Provide specific, user-friendly error messages based on failure type
+    if (status === 403) {
+      throw new RecipeExtractionError(
+        'This website blocks automated access. Try copying the recipe manually.',
+        'URL_BLOCKED',
+        `HTTP 403 Forbidden - The site has anti-scraping protection`
+      );
+    }
+
+    if (status === 404) {
+      throw new RecipeExtractionError(
+        'Recipe page not found. Please check the URL and try again.',
+        'URL_NOT_FOUND',
+        `HTTP 404 - The page may have been moved or deleted`
+      );
+    }
+
+    if (status === 429) {
+      throw new RecipeExtractionError(
+        'Too many requests to this website. Please wait a moment and try again.',
+        'URL_RATE_LIMITED',
+        `HTTP 429 - Rate limited by the recipe website`
+      );
+    }
+
+    if (status >= 500) {
+      throw new RecipeExtractionError(
+        'The recipe website is temporarily unavailable. Please try again later.',
+        'URL_SERVER_ERROR',
+        `HTTP ${status} - The recipe website returned a server error`
+      );
+    }
+
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      throw new RecipeExtractionError(
+        'The request timed out. The website may be slow or unavailable.',
+        'URL_TIMEOUT',
+        'Request exceeded the 15-second timeout'
+      );
+    }
+
+    if (error.code === 'ENOTFOUND' || error.code === 'ERR_BAD_REQUEST') {
+      throw new RecipeExtractionError(
+        'Invalid URL. Please check the web address and try again.',
+        'URL_INVALID',
+        error.message
+      );
+    }
+
     throw new RecipeExtractionError(
-      'Could not fetch the webpage',
+      'Could not fetch the webpage. Please check the URL and try again.',
       'URL_FETCH_FAILED',
       error.message
     );
