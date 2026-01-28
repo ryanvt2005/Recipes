@@ -98,7 +98,11 @@ function getRoundingRule(ingredientName, unit) {
   if (unit) {
     const normalizedUnit = unit.toLowerCase().trim();
     // Whole units (count-based)
-    if (['piece', 'pieces', 'whole', 'head', 'heads', 'bunch', 'bunches', 'clove', 'cloves'].includes(normalizedUnit)) {
+    if (
+      ['piece', 'pieces', 'whole', 'head', 'heads', 'bunch', 'bunches', 'clove', 'cloves'].includes(
+        normalizedUnit
+      )
+    ) {
       return { roundTo: 1, minQuantity: 1 };
     }
     // Small measurements (teaspoons, etc.)
@@ -176,12 +180,16 @@ function isVolumeUnit(unit) {
  * @returns {number} - The converted quantity
  */
 function convertVolume(quantity, fromUnit, toUnit) {
-  if (!quantity || !fromUnit || !toUnit) {return quantity;}
+  if (!quantity || !fromUnit || !toUnit) {
+    return quantity;
+  }
 
   const from = VOLUME_UNITS[fromUnit.toLowerCase().trim()];
   const to = VOLUME_UNITS[toUnit.toLowerCase().trim()];
 
-  if (!from || !to) {return quantity;}
+  if (!from || !to) {
+    return quantity;
+  }
 
   // Convert to teaspoons, then to target unit
   const inTeaspoons = quantity * from.teaspoons;
