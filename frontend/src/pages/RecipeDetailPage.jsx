@@ -22,6 +22,7 @@ export default function RecipeDetailPage() {
   const [scalingError, setScalingError] = useState('');
   const [creatingList, setCreatingList] = useState(false);
   const [showListModal, setShowListModal] = useState(false);
+  const [servingsInput, setServingsInput] = useState('');
 
   useEffect(() => {
     fetchRecipe();
@@ -38,6 +39,7 @@ export default function RecipeDetailPage() {
       // Parse initial servings
       const servings = parseServings(fetchedRecipe.servings);
       setCurrentServings(servings);
+      setServingsInput(servings ? String(servings) : '');
     } catch (err) {
       setError('Failed to load recipe');
     } finally {
@@ -69,6 +71,7 @@ export default function RecipeDetailPage() {
 
       setRecipe(scaledRecipe);
       setCurrentServings(targetServings);
+      setServingsInput(String(targetServings));
     } catch (err) {
       setScalingError('Failed to scale recipe');
     }
@@ -79,7 +82,36 @@ export default function RecipeDetailPage() {
     setRecipe(originalRecipe);
     const servings = parseServings(originalRecipe.servings);
     setCurrentServings(servings);
+    setServingsInput(servings ? String(servings) : '');
     setScalingError('');
+  };
+
+  // Handle direct servings input change
+  const handleServingsInputChange = (e) => {
+    const value = e.target.value;
+    // Allow empty or numeric input
+    if (value === '' || /^\d+$/.test(value)) {
+      setServingsInput(value);
+    }
+  };
+
+  // Handle servings input blur or Enter key
+  const handleServingsInputSubmit = () => {
+    const value = parseInt(servingsInput, 10);
+    if (value && value > 0 && value !== currentServings) {
+      handleScaleRecipe(value);
+    } else if (!value || value <= 0) {
+      // Reset input to current value if invalid
+      setServingsInput(currentServings ? String(currentServings) : '');
+    }
+  };
+
+  // Handle Enter key in servings input
+  const handleServingsKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.target.blur();
+      handleServingsInputSubmit();
+    }
   };
 
   // Increase servings
@@ -358,9 +390,18 @@ export default function RecipeDetailPage() {
                 >
                   <MinusIcon className="w-4 h-4 text-gray-700" />
                 </button>
-                <div className="text-center min-w-[60px]">
-                  <div className="text-xl font-bold text-primary-700">{currentServings}</div>
-                </div>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={servingsInput}
+                  onChange={handleServingsInputChange}
+                  onBlur={handleServingsInputSubmit}
+                  onKeyDown={handleServingsKeyDown}
+                  className="w-16 text-center text-xl font-bold text-primary-700 bg-white border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  title="Enter desired servings"
+                  aria-label="Number of servings"
+                />
                 <button
                   onClick={increaseServings}
                   className="p-1 rounded bg-white border border-gray-300 hover:bg-gray-50 transition-colors"

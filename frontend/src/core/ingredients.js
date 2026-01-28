@@ -371,15 +371,21 @@ export function formatScaledIngredient(ingredient, showOriginal = false) {
   if (isScaled && showOriginal) {
     const originalParts = [];
     originalParts.push(decimalToFraction(ingredient.originalQuantity));
-    if (ingredient.unit) {
-      originalParts.push(ingredient.unit);
+    // Use originalUnit if unit was converted, otherwise use current unit
+    const unitToShow = ingredient.originalUnit || ingredient.unit;
+    if (unitToShow) {
+      originalParts.push(unitToShow);
     }
     originalDisplay = originalParts.join(' ');
   }
+
+  // Check if unit was converted (e.g., tsp → tbsp)
+  const unitConverted = ingredient.unitConverted === true;
 
   return {
     display,
     scaled: isScaled,
     originalDisplay,
+    unitConverted,
   };
 }
