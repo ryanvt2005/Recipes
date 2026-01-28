@@ -5,7 +5,12 @@
  * Framework-agnostic - no React or DOM dependencies.
  */
 
-import { parseQuantity, normalizeUnit, normalizeIngredientName, createIngredientKey } from './ingredients.js';
+import {
+  parseQuantity,
+  normalizeUnit,
+  normalizeIngredientName,
+  createIngredientKey,
+} from './ingredients.js';
 import { categorizeIngredient } from './categories.js';
 
 /**
@@ -178,9 +183,10 @@ export function mergeIntoShoppingList(existingItems, newIngredients) {
 export function scaleIngredients(ingredients, scaleFactor) {
   return ingredients.map((ing) => ({
     ...ing,
-    quantity: ing.quantity !== null && ing.quantity !== undefined
-      ? ing.quantity * scaleFactor
-      : ing.quantity,
+    quantity:
+      ing.quantity !== null && ing.quantity !== undefined
+        ? ing.quantity * scaleFactor
+        : ing.quantity,
   }));
 }
 
@@ -196,9 +202,8 @@ export function calculateScaleFactor(originalServings, targetServings) {
     return 1;
   }
 
-  const parsed = typeof originalServings === 'number'
-    ? originalServings
-    : parseServings(originalServings);
+  const parsed =
+    typeof originalServings === 'number' ? originalServings : parseServings(originalServings);
 
   if (!parsed || parsed <= 0) {
     return 1;

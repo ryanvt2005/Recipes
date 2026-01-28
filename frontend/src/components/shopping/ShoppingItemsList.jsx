@@ -126,6 +126,16 @@ export default function ShoppingItemsList({
                           {item.quantity || item.unit
                             ? `${formatQuantity(item.quantity, item.unit)} ${item.ingredient_name}`
                             : item.ingredient_name}
+                          {/* Show "to taste" or similar inline for quantity-less items */}
+                          {!item.quantity && !item.unit && item.notes && (
+                            <span
+                              className={`ml-2 text-sm font-normal italic ${
+                                item.is_checked ? 'text-gray-400' : 'text-gray-500'
+                              }`}
+                            >
+                              ({item.notes})
+                            </span>
+                          )}
                         </div>
                         {/* Component breakdown for aggregated items (e.g., bell pepper colors) */}
                         {item.components && item.components.length > 0 && (
@@ -145,8 +155,8 @@ export default function ShoppingItemsList({
                             ))}
                           </div>
                         )}
-                        {/* Notes - show breakdown text or custom notes */}
-                        {item.notes && (
+                        {/* Notes - show breakdown text (only if not already shown inline) */}
+                        {item.notes && (item.quantity || item.unit) && (
                           <div
                             className={`text-sm mt-1 ${
                               item.is_checked ? 'text-gray-400' : 'text-gray-500'

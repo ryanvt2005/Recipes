@@ -366,9 +366,7 @@ export function categorizeIngredient(ingredientName) {
 
   // Partial match - check if ingredient name contains any known keywords
   // Sort by keyword length descending to match longer phrases first
-  const sortedKeywords = Object.keys(INGREDIENT_CATEGORY_MAP).sort(
-    (a, b) => b.length - a.length
-  );
+  const sortedKeywords = Object.keys(INGREDIENT_CATEGORY_MAP).sort((a, b) => b.length - a.length);
 
   for (const keyword of sortedKeywords) {
     if (normalized.includes(keyword)) {
