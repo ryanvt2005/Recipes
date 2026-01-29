@@ -2,6 +2,7 @@ const Anthropic = require('@anthropic-ai/sdk');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const crypto = require('crypto');
+const { execSync } = require('child_process');
 const pool = require('../config/database');
 const logger = require('../config/logger');
 const { parseIngredientString: parseIngredient } = require('../utils/ingredientParser');
@@ -101,6 +102,43 @@ async function saveToCache(url, data, extractionMethod) {
 }
 
 /**
+ * Fetch HTML using curl as a fallback for sites that block axios
+ * Some sites (e.g., Cloudflare-protected) detect Node.js via TLS fingerprinting
+ * but allow curl requests.
+ *
+ * Note: Simpler headers often work better with Cloudflare - overly detailed
+ * browser headers can trigger additional challenges.
+ */
+function fetchWithCurl(url) {
+  // Escape URL for shell (replace single quotes)
+  const escapedUrl = url.replace(/'/g, "'\\''");
+
+  // Use minimal headers - paradoxically, simpler headers often bypass Cloudflare better
+  // than full browser fingerprints which can appear suspicious
+  const curlCmd = `curl -sL --max-time 15 --max-redirs 5 \
+    -H 'User-Agent: Mozilla/5.0 (compatible; RecipeApp/1.0)' \
+    --compressed \
+    '${escapedUrl}'`;
+
+  try {
+    const result = execSync(curlCmd, {
+      encoding: 'utf8',
+      timeout: 20000,
+      maxBuffer: 10 * 1024 * 1024, // 10MB max
+    });
+
+    // Check if we got a Cloudflare challenge page instead of real content
+    if (result.includes('Just a moment...') || result.includes('Checking your browser')) {
+      throw new Error('Cloudflare challenge page received');
+    }
+
+    return result;
+  } catch (err) {
+    throw new Error(`curl failed: ${err.message}`);
+  }
+}
+
+/**
  * Fetch HTML from URL
  */
 async function fetchHtml(url) {
@@ -134,14 +172,25 @@ async function fetchHtml(url) {
     return response.data;
   } catch (error) {
     const status = error.response?.status;
-    logger.error('Failed to fetch URL', {
+    logger.error('Failed to fetch URL with axios', {
       url,
       error: error.message,
       status,
     });
 
-    // Provide specific, user-friendly error messages based on failure type
+    // For 403 errors, try curl as a fallback (bypasses TLS fingerprinting)
     if (status === 403) {
+      logger.info('Trying curl fallback for blocked site', { url });
+      try {
+        const html = fetchWithCurl(url);
+        if (html && html.length > 100) {
+          logger.info('Successfully fetched with curl fallback', { url, bytes: html.length });
+          return html;
+        }
+      } catch (curlError) {
+        logger.warn('Curl fallback also failed', { url, error: curlError.message });
+      }
+      // If curl also fails, throw the original error
       throw new RecipeExtractionError(
         'This website blocks automated access. Try copying the recipe manually.',
         'URL_BLOCKED',
@@ -519,9 +568,12 @@ function extractRecipeFromSchema(html) {
   const $ = cheerio.load(html);
   const scripts = $('script[type="application/ld+json"]');
 
+  logger.debug('Schema extraction: searching JSON-LD scripts', { count: scripts.length });
+
   for (let i = 0; i < scripts.length; i++) {
     try {
-      const jsonLd = JSON.parse($(scripts[i]).html());
+      const scriptContent = $(scripts[i]).html();
+      const jsonLd = JSON.parse(scriptContent);
 
       let candidates = [];
       let graph = null;
