@@ -437,3 +437,136 @@ describe('decimalToFraction', () => {
     expect(decimalToFraction(1.57)).toBe('1.57');
   });
 });
+
+describe('section header extraction', () => {
+  describe('"For the X:" patterns', () => {
+    test('extracts "For the Filling:" header and parses ingredient', () => {
+      const result = parseIngredientString('For the Filling: 2 pounds beef short ribs');
+      expect(result.group).toBe('For the Filling');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('lb');
+      expect(result.ingredient).toBe('beef short ribs');
+      expect(result.rawText).toBe('For the Filling: 2 pounds beef short ribs');
+    });
+
+    test('extracts "For the Sauce:" header', () => {
+      const result = parseIngredientString('For the Sauce: 1 cup tomato paste');
+      expect(result.group).toBe('For the Sauce');
+      expect(result.quantity).toBe(1);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('tomato paste');
+    });
+
+    test('extracts "For Topping:" header (without "the")', () => {
+      const result = parseIngredientString('For Topping: 1/2 cup shredded cheese');
+      expect(result.group).toBe('For Topping');
+      expect(result.quantity).toBe(0.5);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('shredded cheese');
+    });
+
+    test('extracts multi-word section names', () => {
+      const result = parseIngredientString('For the Pie Crust: 2 cups flour');
+      expect(result.group).toBe('For the Pie Crust');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('flour');
+    });
+  });
+
+  describe('direct section name patterns', () => {
+    test('extracts "Filling:" header', () => {
+      const result = parseIngredientString('Filling: 3 eggs');
+      expect(result.group).toBe('Filling');
+      expect(result.quantity).toBe(3);
+      expect(result.unit).toBe('piece'); // eggs are countable
+      expect(result.ingredient).toBe('eggs');
+    });
+
+    test('extracts "Sauce:" header', () => {
+      const result = parseIngredientString('Sauce: 2 tbsp olive oil');
+      expect(result.group).toBe('Sauce');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('tbsp');
+      expect(result.ingredient).toBe('olive oil');
+    });
+
+    test('extracts "Marinade:" header', () => {
+      const result = parseIngredientString('Marinade: 1/4 cup soy sauce');
+      expect(result.group).toBe('Marinade');
+      expect(result.quantity).toBe(0.25);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('soy sauce');
+    });
+
+    test('extracts "Frosting:" header', () => {
+      const result = parseIngredientString('Frosting: 1 cup powdered sugar');
+      expect(result.group).toBe('Frosting');
+      expect(result.quantity).toBe(1);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('powdered sugar');
+    });
+
+    test('extracts "Spice Mix:" header', () => {
+      const result = parseIngredientString('Spice Mix: 1 tsp cumin');
+      expect(result.group).toBe('Spice Mix');
+      expect(result.quantity).toBe(1);
+      expect(result.unit).toBe('tsp');
+      expect(result.ingredient).toBe('cumin');
+    });
+  });
+
+  describe('header-only lines (group markers)', () => {
+    test('recognizes header-only line as group marker', () => {
+      const result = parseIngredientString('For the Filling:');
+      expect(result.group).toBe('For the Filling');
+      expect(result.ingredient).toBe('');
+      expect(result.isGroupHeader).toBe(true);
+    });
+
+    test('recognizes "Sauce:" as group marker', () => {
+      const result = parseIngredientString('Sauce:');
+      expect(result.group).toBe('Sauce');
+      expect(result.ingredient).toBe('');
+      expect(result.isGroupHeader).toBe(true);
+    });
+  });
+
+  describe('ingredients without headers (no change)', () => {
+    test('regular ingredient without header has null group', () => {
+      const result = parseIngredientString('2 cups flour');
+      expect(result.group).toBeNull();
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('flour');
+    });
+
+    test('does not falsely detect headers in normal text', () => {
+      // Make sure "For" in the middle of text is not a header
+      const result = parseIngredientString('2 cups flour for baking');
+      expect(result.group).toBeNull();
+      expect(result.ingredient).toBe('flour for baking');
+    });
+  });
+
+  describe('header with to-taste ingredients', () => {
+    test('extracts header from to-taste ingredient', () => {
+      const result = parseIngredientString('For the Rub: salt to taste');
+      expect(result.group).toBe('For the Rub');
+      expect(result.ingredient).toBe('salt');
+      expect(result.notes).toBe('to taste');
+      expect(result.quantity).toBeNull();
+    });
+  });
+
+  describe('header with preparation notes', () => {
+    test('extracts header and preparation', () => {
+      const result = parseIngredientString('For the Sauce: 2 cups tomatoes, diced');
+      expect(result.group).toBe('For the Sauce');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('tomatoes');
+      expect(result.preparation).toBe('diced');
+    });
+  });
+});

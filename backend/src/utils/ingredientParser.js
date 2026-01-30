@@ -251,6 +251,20 @@ const COUNTABLE_INGREDIENTS = new Set([
 ]);
 
 /**
+ * Section header patterns that may be concatenated with ingredient text
+ * These indicate the start of a recipe section (e.g., "For the Filling:", "Sauce:")
+ * Captured as group name and stripped from ingredient text
+ */
+const SECTION_HEADER_PATTERNS = [
+  // "For the X:" or "For X:" patterns (most common)
+  /^(For\s+(?:the\s+)?[A-Za-z]+(?:\s+[A-Za-z]+)?)\s*:\s*/i,
+  // Common section names followed by colon
+  /^((?:Filling|Sauce|Topping|Crust|Dough|Frosting|Glaze|Marinade|Dressing|Batter|Coating|Garnish|Stuffing|Assembly|Base|Crumble|Streusel|Cream|Custard|Syrup|Gravy|Rub|Seasoning|Spice\s*Mix))\s*:\s*/i,
+  // "X Ingredients:" pattern
+  /^([A-Za-z]+(?:\s+[A-Za-z]+)?\s+Ingredients)\s*:\s*/i,
+];
+
+/**
  * Words that are NOT units but might look like them
  * These should be treated as part of the ingredient name
  */
@@ -429,6 +443,38 @@ function parseIngredientString(rawText, sortOrder = 0) {
 
   const original = rawText.trim();
 
+  // Check for embedded section headers (e.g., "For the Filling: 2 cups flour")
+  // Extract as group name and clean the ingredient text
+  let extractedGroup = null;
+  let cleanedText = original;
+
+  for (const pattern of SECTION_HEADER_PATTERNS) {
+    const headerMatch = original.match(pattern);
+    if (headerMatch) {
+      extractedGroup = headerMatch[1].trim();
+      cleanedText = original.substring(headerMatch[0].length).trim();
+      break;
+    }
+  }
+
+  // If the cleaned text is empty after removing header, the whole line was just a header
+  // Return it as a group marker (no actual ingredient)
+  if (extractedGroup && !cleanedText) {
+    return {
+      rawText: original,
+      sortOrder,
+      quantity: null,
+      unit: null,
+      ingredient: '',
+      preparation: null,
+      group: extractedGroup,
+      isGroupHeader: true,
+    };
+  }
+
+  // Use cleaned text for further parsing
+  const textToParse = cleanedText;
+
   // Check for "to taste" patterns - these have null quantity
   let matchedToTastePhrase = null;
   const toTastePhrasePatterns = [
@@ -441,7 +487,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
   ];
 
   for (const { regex, phrase } of toTastePhrasePatterns) {
-    if (regex.test(original)) {
+    if (regex.test(textToParse)) {
       matchedToTastePhrase = phrase;
       break;
     }
@@ -450,7 +496,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
   // If "to taste" pattern found, return early with the full text as ingredient
   if (matchedToTastePhrase) {
     // Try to extract the ingredient name (remove the "to taste" part for cleaner display)
-    let ingredientName = original
+    let ingredientName = textToParse
       .replace(
         /,?\s*(to\s+taste|as\s+needed|to\s+your\s+(liking|preference)|optional|for\s+garnish|for\s+serving)/gi,
         ''
@@ -464,22 +510,22 @@ function parseIngredientString(rawText, sortOrder = 0) {
       sortOrder,
       quantity: null,
       unit: null,
-      ingredient: ingredientName || original,
+      ingredient: ingredientName || textToParse,
       preparation: null,
       notes: matchedToTastePhrase,
-      group: null,
+      group: extractedGroup,
     };
   }
 
   // First, try to split by comma for preparation notes
   // e.g., "2 cups flour, sifted" → ingredient: "flour", preparation: "sifted"
-  let mainPart = original;
+  let mainPart = textToParse;
   let preparation = null;
 
-  const commaIndex = original.indexOf(',');
+  const commaIndex = textToParse.indexOf(',');
   if (commaIndex > 0) {
-    mainPart = original.substring(0, commaIndex).trim();
-    preparation = original.substring(commaIndex + 1).trim();
+    mainPart = textToParse.substring(0, commaIndex).trim();
+    preparation = textToParse.substring(commaIndex + 1).trim();
   }
 
   // Also check for parenthetical notes
@@ -551,9 +597,9 @@ function parseIngredientString(rawText, sortOrder = 0) {
     ingredientName = ingredientName.substring(3).trim();
   }
 
-  // If we still don't have an ingredient name, use the whole original text
+  // If we still don't have an ingredient name, use the cleaned text (or original if no header)
   if (!ingredientName) {
-    ingredientName = original;
+    ingredientName = textToParse || original;
   }
 
   // Infer "piece" unit for countable ingredients that have quantity but no unit
@@ -571,7 +617,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
     unit,
     ingredient: ingredientName,
     preparation,
-    group: null,
+    group: extractedGroup,
   };
 }
 
@@ -706,4 +752,5 @@ module.exports = {
   TO_TASTE_PATTERNS,
   COUNTABLE_INGREDIENTS,
   VAGUE_QUANTITIES,
+  SECTION_HEADER_PATTERNS,
 };
