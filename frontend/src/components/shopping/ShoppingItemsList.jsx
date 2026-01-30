@@ -126,14 +126,14 @@ export default function ShoppingItemsList({
                           {item.quantity || item.unit
                             ? `${formatQuantity(item.quantity, item.unit)} ${item.ingredient_name}`
                             : item.ingredient_name}
-                          {/* Show "to taste" or similar inline for quantity-less items */}
-                          {!item.quantity && !item.unit && item.notes && (
+                          {/* Show notes inline for quantity-less items (e.g., "to taste", "as needed") */}
+                          {!item.quantity && !item.unit && (
                             <span
                               className={`ml-2 text-sm font-normal italic ${
                                 item.is_checked ? 'text-gray-400' : 'text-gray-500'
                               }`}
                             >
-                              ({item.notes})
+                              ({item.notes || 'as needed'})
                             </span>
                           )}
                         </div>
@@ -157,12 +157,43 @@ export default function ShoppingItemsList({
                         )}
                         {/* Notes - show breakdown text (only if not already shown inline) */}
                         {item.notes && (item.quantity || item.unit) && (
-                          <div
-                            className={`text-sm mt-1 ${
-                              item.is_checked ? 'text-gray-400' : 'text-gray-500'
-                            }`}
-                          >
-                            {item.notes}
+                          <div className="mt-1">
+                            {item.notes.startsWith('Mixed:') ? (
+                              // Display mixed units as styled pills
+                              <div className="flex flex-wrap gap-1.5 items-center">
+                                <span
+                                  className={`text-xs ${item.is_checked ? 'text-gray-400' : 'text-gray-500'}`}
+                                >
+                                  Combines:
+                                </span>
+                                {item.notes
+                                  .replace('Mixed: ', '')
+                                  .split(' + ')
+                                  .map((part, idx) => (
+                                    <span
+                                      key={idx}
+                                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                                        item.is_checked
+                                          ? 'bg-gray-100 text-gray-400'
+                                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                      }`}
+                                    >
+                                      {part.trim()}
+                                    </span>
+                                  ))}
+                              </div>
+                            ) : (
+                              // Regular notes display - styled as inline pill for better visibility
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${
+                                  item.is_checked
+                                    ? 'bg-gray-100 text-gray-400'
+                                    : 'bg-blue-50 text-blue-700 border border-blue-200'
+                                }`}
+                              >
+                                📝 {item.notes}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
