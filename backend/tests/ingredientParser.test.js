@@ -83,6 +83,33 @@ describe('parseQuantity', () => {
       expect(parseQuantity(' 1/2 ')).toBe(0.5);
     });
   });
+
+  describe('vague quantities', () => {
+    test('parses "a few" as approximately 3', () => {
+      expect(parseQuantity('a few')).toBe(3);
+    });
+
+    test('parses "a couple" as 2', () => {
+      expect(parseQuantity('a couple')).toBe(2);
+    });
+
+    test('parses "several" as approximately 4', () => {
+      expect(parseQuantity('several')).toBe(4);
+    });
+
+    test('parses "a pinch" as small amount', () => {
+      expect(parseQuantity('a pinch')).toBe(0.125);
+    });
+
+    test('parses "a handful" as approximately 0.5', () => {
+      expect(parseQuantity('a handful')).toBe(0.5);
+    });
+
+    test('parses quantity modifiers', () => {
+      expect(parseQuantity('heaping')).toBe(1.25);
+      expect(parseQuantity('scant')).toBe(0.875);
+    });
+  });
 });
 
 describe('normalizeUnit', () => {
@@ -233,6 +260,40 @@ describe('parseIngredientString', () => {
       expect(result.unit).toBeNull();
       expect(result.ingredient).toBe('olive oil');
       expect(result.notes).toBe('as needed');
+    });
+  });
+
+  describe('vague quantity ingredients', () => {
+    test('parses "a few cloves of garlic"', () => {
+      const result = parseIngredientString('a few cloves of garlic');
+      expect(result.quantity).toBe(3); // "a few" = 3
+      expect(result.unit).toBe('clove');
+      expect(result.ingredient).toBe('garlic');
+    });
+
+    test('parses "several stalks of celery"', () => {
+      const result = parseIngredientString('several stalks celery');
+      expect(result.quantity).toBe(4); // "several" = 4
+      expect(result.unit).toBe('stalk');
+      expect(result.ingredient).toBe('celery');
+    });
+
+    test('parses "a pinch of salt"', () => {
+      const result = parseIngredientString('a pinch of salt');
+      expect(result.quantity).toBe(0.125);
+      expect(result.ingredient).toBe('salt');
+    });
+
+    test('parses "a handful of spinach"', () => {
+      const result = parseIngredientString('a handful spinach');
+      expect(result.quantity).toBe(0.5);
+      expect(result.ingredient).toBe('spinach');
+    });
+
+    test('parses "a couple eggs"', () => {
+      const result = parseIngredientString('a couple eggs');
+      expect(result.quantity).toBe(2);
+      expect(result.ingredient).toBe('eggs');
     });
   });
 

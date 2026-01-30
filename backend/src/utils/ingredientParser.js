@@ -17,6 +17,54 @@
  */
 
 /**
+ * Vague quantity words mapped to approximate numeric values
+ * These are common in recipes but imprecise
+ */
+const VAGUE_QUANTITIES = {
+  // Small amounts
+  'a pinch': 0.125, // ~1/8 tsp equivalent
+  'pinch': 0.125,
+  'a dash': 0.125,
+  'dash': 0.125,
+  'a splash': 1, // ~1 tbsp equivalent
+  'splash': 1,
+  'a drizzle': 1,
+  'drizzle': 1,
+  'a drop': 0.05,
+  'drop': 0.05,
+  'few drops': 0.15,
+  'a few drops': 0.15,
+
+  // Count-based vague quantities
+  'a few': 3,
+  'few': 3,
+  'a couple': 2,
+  'couple': 2,
+  'several': 4,
+  'some': 3,
+  'a handful': 0.5, // ~1/2 cup equivalent
+  'handful': 0.5,
+
+  // Approximate amounts
+  'a little': 1,
+  'little': 1,
+  'a bit': 1,
+  'bit': 1,
+  'a small amount': 1,
+  'small amount': 1,
+  'a generous amount': 2,
+  'generous amount': 2,
+  'a heaping': 1.25, // ~25% more than level
+  'heaping': 1.25,
+  'a scant': 0.875, // ~slightly less than full
+  'scant': 0.875,
+  'a rounded': 1.1,
+  'rounded': 1.1,
+  'a level': 1,
+  'level': 1,
+};
+
+/**
  * Unicode fraction to decimal mapping
  */
 const UNICODE_FRACTIONS = {
@@ -287,7 +335,7 @@ function normalizeUnit(unit) {
 
 /**
  * Parse a quantity string into a number
- * Handles fractions, mixed numbers, ranges, and Unicode fractions
+ * Handles fractions, mixed numbers, ranges, Unicode fractions, and vague quantities
  *
  * @param {string} quantityStr - Raw quantity string
  * @returns {number|null} Parsed numeric value or null
@@ -298,6 +346,14 @@ function parseQuantity(quantityStr) {
   }
 
   let str = String(quantityStr).trim();
+  const lowerStr = str.toLowerCase();
+
+  // Check for vague quantities first (e.g., "a few", "several", "a pinch")
+  for (const [phrase, value] of Object.entries(VAGUE_QUANTITIES)) {
+    if (lowerStr === phrase || lowerStr.startsWith(phrase + ' ')) {
+      return value;
+    }
+  }
 
   // Normalize spacing around Unicode fractions (handle "1 ½" and "1½" consistently)
   for (const frac of Object.keys(UNICODE_FRACTIONS)) {
@@ -433,19 +489,34 @@ function parseIngredientString(rawText, sortOrder = 0) {
     preparation = preparation ? `${parenMatch[2]}, ${preparation}` : parenMatch[2];
   }
 
-  // Build regex pattern for quantity detection
-  // Matches: numbers, fractions, mixed numbers, Unicode fractions, ranges
-  const quantityPattern =
-    /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+\.?\d*\s*[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|\d+\.?\d*(?:\s*(?:-|to|or)\s*\d+\.?\d*)?)\s*/i;
-
-  const quantityMatch = mainPart.match(quantityPattern);
-
+  // Check for vague quantity phrases first (e.g., "a few cloves of garlic")
   let quantity = null;
   let remainingText = mainPart;
+  let vagueQuantityMatched = false;
 
-  if (quantityMatch) {
-    quantity = parseQuantity(quantityMatch[1]);
-    remainingText = mainPart.substring(quantityMatch[0].length).trim();
+  const lowerMainPart = mainPart.toLowerCase();
+  for (const [phrase, value] of Object.entries(VAGUE_QUANTITIES)) {
+    if (lowerMainPart.startsWith(phrase + ' ') || lowerMainPart === phrase) {
+      quantity = value;
+      remainingText = mainPart.substring(phrase.length).trim();
+      vagueQuantityMatched = true;
+      break;
+    }
+  }
+
+  // If no vague quantity, try numeric quantity detection
+  if (!vagueQuantityMatched) {
+    // Build regex pattern for quantity detection
+    // Matches: numbers, fractions, mixed numbers, Unicode fractions, ranges
+    const quantityPattern =
+      /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+\.?\d*\s*[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|\d+\.?\d*(?:\s*(?:-|to|or)\s*\d+\.?\d*)?)\s*/i;
+
+    const quantityMatch = mainPart.match(quantityPattern);
+
+    if (quantityMatch) {
+      quantity = parseQuantity(quantityMatch[1]);
+      remainingText = mainPart.substring(quantityMatch[0].length).trim();
+    }
   }
 
   // Now try to extract unit from the remaining text
@@ -634,4 +705,5 @@ module.exports = {
   UNICODE_FRACTIONS,
   TO_TASTE_PATTERNS,
   COUNTABLE_INGREDIENTS,
+  VAGUE_QUANTITIES,
 };
