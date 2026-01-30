@@ -166,24 +166,22 @@ export default function ShoppingItemsList({
                           </div>
                         )}
                       </div>
-                      {/* Category selector - only on desktop or when not in mobile tab view */}
-                      {!isMobile && (
-                        <select
-                          value={item.category || 'Other'}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            onUpdateCategory(item.id, e.target.value);
-                          }}
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-xs px-2 py-1 border border-gray-300 rounded bg-white hover:border-primary-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 no-print self-center"
-                        >
-                          {CATEGORY_ORDER.map((cat) => (
-                            <option key={cat} value={cat}>
-                              {cat}
-                            </option>
-                          ))}
-                        </select>
-                      )}
+                      {/* Category selector */}
+                      <select
+                        value={item.category || 'Other'}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          onUpdateCategory(item.id, e.target.value);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs px-2 py-1 border border-gray-300 rounded bg-white hover:border-primary-400 focus:ring-1 focus:ring-primary-500 focus:border-primary-500 no-print self-center flex-shrink-0"
+                      >
+                        {CATEGORY_ORDER.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
                       {/* Delete button */}
                       <button
                         type="button"
