@@ -317,7 +317,8 @@ function parseSchemaIngredients(ingredients) {
           const text = typeof item === 'string' ? item : item.text || item.name;
           if (text) {
             const parsedIng = parseIngredientString(text, sortOrder++);
-            parsedIng.group = currentGroup;
+            // HowToSection group takes precedence, fallback to parser's embedded header
+            parsedIng.group = currentGroup || parsedIng.group;
             parsed.push(parsedIng);
           }
         });
@@ -326,13 +327,15 @@ function parseSchemaIngredients(ingredients) {
     // Handle plain string
     else if (typeof ingredient === 'string') {
       const parsedIng = parseIngredientString(ingredient, sortOrder++);
-      parsedIng.group = currentGroup;
+      // Preserve group from parser (embedded header) if no HowToSection group
+      parsedIng.group = currentGroup || parsedIng.group;
       parsed.push(parsedIng);
     }
     // Handle object with text property
     else if (typeof ingredient === 'object' && ingredient.text) {
       const parsedIng = parseIngredientString(ingredient.text, sortOrder++);
-      parsedIng.group = currentGroup;
+      // Preserve group from parser (embedded header) if no HowToSection group
+      parsedIng.group = currentGroup || parsedIng.group;
       parsed.push(parsedIng);
     }
   });
