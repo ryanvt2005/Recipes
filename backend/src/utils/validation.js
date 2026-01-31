@@ -33,7 +33,9 @@ const ingredientSchema = Joi.object({
   ingredient: Joi.string().max(200).required(),
   preparation: Joi.string().max(200).optional().allow(null),
   group: Joi.string().max(100).optional().allow(null),
-});
+  sortOrder: Joi.number().optional(), // Allow sortOrder from extraction
+  notes: Joi.string().optional().allow(null), // Allow notes field
+}).unknown(true); // Allow additional fields from extraction
 
 // Recipe instruction schema (just a string)
 const instructionSchema = Joi.string().required();
@@ -52,7 +54,9 @@ const saveRecipeSchema = Joi.object({
   instructions: Joi.array().items(instructionSchema).min(1).required(),
   tags: Joi.array().items(Joi.string().max(50)).optional(),
   extractionMethod: Joi.string().valid('schema', 'llm', 'manual').optional(),
-});
+  author: Joi.string().max(200).optional().allow(null, ''), // Allow author from extraction
+  extractionQuality: Joi.object().optional(), // Allow extraction quality metadata
+}).unknown(true); // Allow additional fields from extraction
 
 // Recipe update schema (same as save but with optional fields)
 const updateRecipeSchema = Joi.object({
@@ -111,6 +115,9 @@ function validate(schema) {
         field: detail.path.join('.'),
         message: detail.message,
       }));
+
+      // Log validation errors for debugging
+      console.error('Validation failed:', JSON.stringify(errors, null, 2));
 
       return res.status(400).json({
         error: 'Validation failed',

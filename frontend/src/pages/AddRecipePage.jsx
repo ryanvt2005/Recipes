@@ -398,26 +398,59 @@ export default function AddRecipePage() {
                 </Button>
               </div>
               <div className="space-y-3">
-                {extractedRecipe.ingredients.map((ingredient, index) => (
-                  <div key={index} className="flex gap-2 items-start">
-                    <Input
-                      value={ingredient.rawText || ingredient.ingredient}
-                      onChange={(e) => handleIngredientChange(index, 'rawText', e.target.value)}
-                      placeholder="e.g., 2 cups flour"
-                      className="flex-1 !mb-0"
-                    />
-                    {extractedRecipe.ingredients.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeIngredient(index)}
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                        aria-label="Remove ingredient"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
+                {(() => {
+                  // Group ingredients by their group field for display
+                  let lastGroup = null;
+                  return extractedRecipe.ingredients.map((ingredient, index) => {
+                    // Build display value from parsed components (clean, without section headers)
+                    const displayValue = (() => {
+                      if (ingredient.group && ingredient.ingredient) {
+                        const parts = [];
+                        if (ingredient.quantity) parts.push(ingredient.quantity);
+                        if (ingredient.unit) parts.push(ingredient.unit);
+                        parts.push(ingredient.ingredient);
+                        if (ingredient.preparation) parts.push(`, ${ingredient.preparation}`);
+                        return parts.join(' ');
+                      }
+                      return ingredient.rawText || ingredient.ingredient;
+                    })();
+
+                    // Check if we need to show a new group header
+                    const showGroupHeader = ingredient.group && ingredient.group !== lastGroup;
+                    lastGroup = ingredient.group;
+
+                    return (
+                      <div key={index}>
+                        {showGroupHeader && (
+                          <div className="flex items-center gap-2 mt-4 mb-2 first:mt-0">
+                            <span className="text-sm font-semibold text-primary-700 bg-primary-50 px-3 py-1 rounded-full">
+                              {ingredient.group}
+                            </span>
+                            <div className="flex-1 h-px bg-gray-200"></div>
+                          </div>
+                        )}
+                        <div className="flex gap-2 items-start">
+                          <Input
+                            value={displayValue}
+                            onChange={(e) => handleIngredientChange(index, 'rawText', e.target.value)}
+                            placeholder="e.g., 2 cups flour"
+                            className="flex-1 !mb-0"
+                          />
+                          {extractedRecipe.ingredients.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeIngredient(index)}
+                              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                              aria-label="Remove ingredient"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 

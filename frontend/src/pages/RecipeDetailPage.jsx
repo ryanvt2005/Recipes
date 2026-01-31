@@ -483,12 +483,30 @@ export default function RecipeDetailPage() {
           <div className="md:col-span-2 card">
             <h2 className="text-2xl font-bold mb-4">Ingredients</h2>
             <ul className="space-y-2">
-              {recipe.ingredients.map((ingredient, index) => (
-                <li key={ingredient.id || index} className="flex items-start">
-                  <input type="checkbox" className="mt-1 mr-3 h-4 w-4 text-primary-600 rounded" />
-                  <span className="text-gray-700">{formatQuantity(ingredient)}</span>
-                </li>
-              ))}
+              {(() => {
+                let lastGroup = null;
+                return recipe.ingredients.map((ingredient, index) => {
+                  const showGroupHeader = ingredient.ingredientGroup && ingredient.ingredientGroup !== lastGroup;
+                  lastGroup = ingredient.ingredientGroup;
+
+                  return (
+                    <li key={ingredient.id || index}>
+                      {showGroupHeader && (
+                        <div className="flex items-center gap-2 mt-4 mb-2 first:mt-0">
+                          <span className="text-sm font-semibold text-primary-700 bg-primary-50 px-3 py-1 rounded-full">
+                            {ingredient.ingredientGroup}
+                          </span>
+                          <div className="flex-1 h-px bg-gray-200"></div>
+                        </div>
+                      )}
+                      <div className="flex items-start">
+                        <input type="checkbox" className="mt-1 mr-3 h-4 w-4 text-primary-600 rounded" />
+                        <span className="text-gray-700">{formatQuantity(ingredient)}</span>
+                      </div>
+                    </li>
+                  );
+                });
+              })()}
             </ul>
           </div>
 
