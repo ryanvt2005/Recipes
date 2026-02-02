@@ -1,5 +1,5 @@
 const pool = require('../config/database');
-const { extractRecipe, RecipeExtractionError } = require('../services/recipeExtractionService');
+const { extractRecipe, RecipeExtractionError, normalizeUrl } = require('../services/recipeExtractionService');
 const logger = require('../config/logger');
 const { scaleRecipe } = require('../utils/recipeScaling');
 const { ErrorCodes, sendError, errors } = require('../utils/errorResponse');
@@ -37,8 +37,31 @@ async function getIngredientsForRecipes(req, res) {
  */
 async function extractRecipeFromUrl(req, res) {
   const { url } = req.body;
+  const userId = req.user.userId;
 
   try {
+    // Check for duplicate before extraction
+    const normalizedUrl = normalizeUrl(url);
+    const existing = await pool.query(
+      `SELECT id, title, image_url, created_at
+       FROM recipes
+       WHERE user_id = $1 AND source_url = $2`,
+      [userId, normalizedUrl]
+    );
+
+    if (existing.rows.length > 0) {
+      return sendError(res, 409, ErrorCodes.DUPLICATE_RECIPE,
+        'You already have this recipe saved', {
+          existingRecipe: {
+            id: existing.rows[0].id,
+            title: existing.rows[0].title,
+            imageUrl: existing.rows[0].image_url,
+            createdAt: existing.rows[0].created_at
+          }
+        }
+      );
+    }
+
     const recipe = await extractRecipe(url);
 
     res.status(200).json({ recipe });
@@ -188,15 +211,16 @@ async function getRecipes(req, res) {
     tags = '',
     sortBy = 'createdAt',
     sortOrder = 'desc',
+    maxCookTime = '',
   } = req.query;
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
-  const validSortBy = ['createdAt', 'title', 'updatedAt'].includes(sortBy) ? sortBy : 'createdAt';
+  const validSortBy = ['createdAt', 'title', 'updatedAt', 'cookTime', 'totalTime'].includes(sortBy) ? sortBy : 'createdAt';
   const validSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
 
   try {
     let query = `
-      SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.total_time, r.created_at
+      SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.cook_time, r.total_time, r.created_at
       FROM recipes r
       WHERE r.user_id = $1
     `;
@@ -224,10 +248,38 @@ async function getRecipes(req, res) {
       params.push(tagArray);
     }
 
+    // Add cook time filter (handles ISO 8601 PT format and "X minutes" format)
+    if (maxCookTime) {
+      const maxMinutes = parseInt(maxCookTime);
+      if (!isNaN(maxMinutes) && maxMinutes > 0) {
+        paramCount++;
+        // Filter recipes where cook_time can be parsed and is <= maxMinutes
+        // Handles: "30 minutes", "1 hour", "PT30M", "PT1H", "PT1H30M"
+        query += ` AND (
+          -- "X minutes" or "X minute" format
+          (r.cook_time ~* '^[0-9]+ *min' AND
+           CAST(REGEXP_REPLACE(r.cook_time, '[^0-9].*', '', 'g') AS INTEGER) <= $${paramCount})
+          OR
+          -- "X hours" or "X hour" format (convert to minutes, assume no additional minutes)
+          (r.cook_time ~* '^[0-9]+ *hour' AND
+           CAST(REGEXP_REPLACE(r.cook_time, '[^0-9].*', '', 'g') AS INTEGER) * 60 <= $${paramCount})
+          OR
+          -- ISO 8601 PT format with minutes only (e.g., PT30M)
+          (r.cook_time ~* '^PT[0-9]+M$' AND
+           CAST(REGEXP_REPLACE(r.cook_time, '[^0-9]', '', 'g') AS INTEGER) <= $${paramCount})
+          OR
+          -- ISO 8601 PT format with hours only (e.g., PT1H)
+          (r.cook_time ~* '^PT[0-9]+H$' AND
+           CAST(REGEXP_REPLACE(r.cook_time, '[^0-9]', '', 'g') AS INTEGER) * 60 <= $${paramCount})
+        )`;
+        params.push(maxMinutes);
+      }
+    }
+
     // Get total count
     const countResult = await pool.query(
       query.replace(
-        'SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.total_time, r.created_at',
+        'SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.cook_time, r.total_time, r.created_at',
         'SELECT COUNT(DISTINCT r.id)'
       ),
       params
@@ -240,7 +292,11 @@ async function getRecipes(req, res) {
         ? 'r.created_at'
         : validSortBy === 'updatedAt'
           ? 'r.updated_at'
-          : 'r.title';
+          : validSortBy === 'cookTime'
+            ? 'r.cook_time'
+            : validSortBy === 'totalTime'
+              ? 'r.total_time'
+              : 'r.title';
     query += ` ORDER BY ${sortColumn} ${validSortOrder}`;
     query += ` LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     params.push(parseInt(limit), offset);
@@ -264,6 +320,7 @@ async function getRecipes(req, res) {
           description: recipe.description,
           imageUrl: recipe.image_url,
           servings: recipe.servings,
+          cookTime: recipe.cook_time,
           totalTime: recipe.total_time,
           tags: tagsResult.rows.map((t) => t.name),
           createdAt: recipe.created_at,
@@ -601,6 +658,31 @@ async function deleteRecipe(req, res) {
   }
 }
 
+/**
+ * Get all tags used by the user's recipes
+ */
+async function getUserTags(req, res) {
+  const userId = req.user.userId;
+
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT t.id, t.name, COUNT(rt.recipe_id)::int as recipe_count
+       FROM tags t
+       INNER JOIN recipe_tags rt ON t.id = rt.tag_id
+       INNER JOIN recipes r ON rt.recipe_id = r.id
+       WHERE r.user_id = $1
+       GROUP BY t.id, t.name
+       ORDER BY t.name`,
+      [userId]
+    );
+
+    res.status(200).json({ tags: result.rows });
+  } catch (error) {
+    logger.error('Get user tags error', { error: error.message });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch tags');
+  }
+}
+
 module.exports = {
   extractRecipeFromUrl,
   saveRecipe,
@@ -610,4 +692,5 @@ module.exports = {
   updateRecipe,
   deleteRecipe,
   getIngredientsForRecipes,
+  getUserTags,
 };

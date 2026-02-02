@@ -8,6 +8,7 @@ const {
   updateRecipe,
   deleteRecipe,
   getIngredientsForRecipes,
+  getUserTags,
 } = require('../controllers/recipeController');
 const {
   getNoteForRecipe,
@@ -52,6 +53,9 @@ router.post('/', authenticateToken, validate(saveRecipeSchema), saveRecipe);
 
 // GET /api/v1/recipes - Get all recipes for user
 router.get('/', authenticateToken, getRecipes);
+
+// GET /api/v1/recipes/tags - Get all tags for user's recipes
+router.get('/tags', authenticateToken, getUserTags);
 
 // GET /api/v1/recipes/:id - Get a single recipe
 router.get('/:id', authenticateToken, getRecipe);

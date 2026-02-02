@@ -84,6 +84,12 @@ export const recipesApi = {
    * @returns {Promise} - Response with ingredients array
    */
   getIngredientsForRecipes: (recipeIds) => http.post('/recipes/ingredients-preview', { recipeIds }),
+
+  /**
+   * Get all tags used by the current user's recipes
+   * @returns {Promise} - Response with tags array including recipe counts
+   */
+  getTags: () => http.get('/recipes/tags'),
 };
 
 export default recipesApi;

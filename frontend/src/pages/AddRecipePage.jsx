@@ -24,6 +24,7 @@ export default function AddRecipePage() {
   const [extractedRecipe, setExtractedRecipe] = useState(null);
   const [extractionStatus, setExtractionStatus] = useState('');
   const [extractionMeta, setExtractionMeta] = useState(null); // Stores quality score, method, cached
+  const [duplicateRecipe, setDuplicateRecipe] = useState(null); // Stores existing recipe if duplicate URL
 
   const navigate = useNavigate();
   const statusIntervalRef = useRef(null);
@@ -47,6 +48,7 @@ export default function AddRecipePage() {
   const handleExtract = async (e) => {
     e.preventDefault();
     setError('');
+    setDuplicateRecipe(null);
     setExtracting(true);
     setExtractionStatus(EXTRACTION_MESSAGES[0]);
     setExtractionMeta(null);
@@ -77,7 +79,12 @@ export default function AddRecipePage() {
 
       setExtractedRecipe(recipe);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to extract recipe from URL');
+      if (err.response?.status === 409 && err.response?.data?.details?.existingRecipe) {
+        setDuplicateRecipe(err.response.data.details.existingRecipe);
+        setError('You already have this recipe saved.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to extract recipe from URL');
+      }
     } finally {
       if (statusIntervalRef.current) {
         clearInterval(statusIntervalRef.current);
@@ -234,9 +241,49 @@ export default function AddRecipePage() {
                 required
               />
 
-              {error && (
+              {error && !duplicateRecipe && (
                 <div className="rounded-md bg-red-50 p-4">
                   <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+
+              {duplicateRecipe && (
+                <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
+                  <div className="flex items-start gap-3">
+                    {duplicateRecipe.imageUrl && (
+                      <img
+                        src={duplicateRecipe.imageUrl}
+                        alt={duplicateRecipe.title}
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-yellow-800">{duplicateRecipe.title}</h4>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Saved on {new Date(duplicateRecipe.createdAt).toLocaleDateString()}
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(`/recipes/${duplicateRecipe.id}`)}
+                        >
+                          View Recipe
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setDuplicateRecipe(null);
+                            setError('');
+                            setUrl('');
+                          }}
+                        >
+                          Try Different URL
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
