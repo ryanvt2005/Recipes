@@ -19,11 +19,49 @@ export default function RecipesPage() {
   // eslint-disable-next-line no-unused-vars
   const [creatingList, setCreatingList] = useState(false);
 
+  // Filter state
+  const [availableTags, setAvailableTags] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [maxCookTime, setMaxCookTime] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Category filter state
+  const [availableCuisines, setAvailableCuisines] = useState([]);
+  const [selectedCuisines, setSelectedCuisines] = useState([]);
+  const [availableMealTypes, setAvailableMealTypes] = useState([]);
+  const [selectedMealTypes, setSelectedMealTypes] = useState([]);
+  const [availableDietaryLabels, setAvailableDietaryLabels] = useState([]);
+  const [selectedDietaryLabels, setSelectedDietaryLabels] = useState([]);
+
   const navigate = useNavigate();
 
+  // Fetch tags and categories on mount
+  useEffect(() => {
+    const fetchFilters = async () => {
+      try {
+        const [tagsRes, cuisinesRes, mealTypesRes, dietaryRes] = await Promise.all([
+          recipes.getTags(),
+          recipes.getCuisines(),
+          recipes.getMealTypes(),
+          recipes.getDietaryLabels(),
+        ]);
+        setAvailableTags(tagsRes.data.tags || []);
+        setAvailableCuisines(cuisinesRes.data.cuisines || []);
+        setAvailableMealTypes(mealTypesRes.data.mealTypes || []);
+        setAvailableDietaryLabels(dietaryRes.data.dietaryLabels || []);
+      } catch (err) {
+        console.error('Failed to load filters:', err);
+      }
+    };
+    fetchFilters();
+  }, []);
+
+  // Fetch recipes when filters change
   useEffect(() => {
     fetchRecipes();
-  }, [page, search]);
+  }, [page, search, selectedTags, sortBy, sortOrder, maxCookTime, selectedCuisines, selectedMealTypes, selectedDietaryLabels]);
 
   const fetchRecipes = async () => {
     try {
@@ -32,8 +70,13 @@ export default function RecipesPage() {
         page,
         limit: 12,
         search,
-        sortBy: 'createdAt',
-        sortOrder: 'desc',
+        tags: selectedTags.join(','),
+        sortBy,
+        sortOrder,
+        maxCookTime,
+        cuisines: selectedCuisines.join(','),
+        mealTypes: selectedMealTypes.join(','),
+        dietaryLabels: selectedDietaryLabels.join(','),
       });
       setRecipeList(response.data.recipes);
       setPagination(response.data.pagination);
@@ -47,8 +90,71 @@ export default function RecipesPage() {
   const handleSearch = (e) => {
     e.preventDefault();
     setPage(1);
-    fetchRecipes();
   };
+
+  const toggleTag = (tagName) => {
+    setSelectedTags((prev) =>
+      prev.includes(tagName) ? prev.filter((t) => t !== tagName) : [...prev, tagName]
+    );
+    setPage(1);
+  };
+
+  const toggleCuisine = (cuisineId) => {
+    setSelectedCuisines((prev) =>
+      prev.includes(cuisineId) ? prev.filter((c) => c !== cuisineId) : [...prev, cuisineId]
+    );
+    setPage(1);
+  };
+
+  const toggleMealType = (mealTypeId) => {
+    setSelectedMealTypes((prev) =>
+      prev.includes(mealTypeId) ? prev.filter((m) => m !== mealTypeId) : [...prev, mealTypeId]
+    );
+    setPage(1);
+  };
+
+  const toggleDietaryLabel = (dietaryLabelId) => {
+    setSelectedDietaryLabels((prev) =>
+      prev.includes(dietaryLabelId) ? prev.filter((d) => d !== dietaryLabelId) : [...prev, dietaryLabelId]
+    );
+    setPage(1);
+  };
+
+  const clearFilters = () => {
+    setSelectedTags([]);
+    setSelectedCuisines([]);
+    setSelectedMealTypes([]);
+    setSelectedDietaryLabels([]);
+    setSortBy('createdAt');
+    setSortOrder('desc');
+    setMaxCookTime('');
+    setSearch('');
+    setPage(1);
+  };
+
+  const hasActiveFilters =
+    selectedTags.length > 0 ||
+    selectedCuisines.length > 0 ||
+    selectedMealTypes.length > 0 ||
+    selectedDietaryLabels.length > 0 ||
+    maxCookTime ||
+    sortBy !== 'createdAt' ||
+    sortOrder !== 'desc';
+
+  const cookTimeOptions = [
+    { value: '', label: 'Any time' },
+    { value: '15', label: 'Under 15 min' },
+    { value: '30', label: 'Under 30 min' },
+    { value: '45', label: 'Under 45 min' },
+    { value: '60', label: 'Under 1 hour' },
+  ];
+
+  const sortOptions = [
+    { value: 'createdAt', label: 'Date Added' },
+    { value: 'title', label: 'Alphabetical' },
+    { value: 'cookTime', label: 'Cook Time' },
+    { value: 'totalTime', label: 'Total Time' },
+  ];
 
   const toggleRecipeSelection = (recipeId) => {
     setSelectedRecipes((prev) =>
@@ -107,17 +213,284 @@ export default function RecipesPage() {
           </Link>
         </div>
 
-        {/* Search */}
-        <form onSubmit={handleSearch} className="flex gap-2">
-          <input
-            type="text"
-            placeholder="Search recipes by title or ingredients..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="flex-1 input"
-          />
-          <Button type="submit">Search</Button>
-        </form>
+        {/* Search and Filters */}
+        <div className="space-y-4">
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Search recipes by title or ingredients..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="flex-1 input"
+            />
+            <Button type="submit">Search</Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowFilters(!showFilters)}
+              className={showFilters ? 'bg-primary-100' : ''}
+            >
+              <svg
+                className="w-5 h-5 mr-1"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
+                />
+              </svg>
+              Filters
+              {hasActiveFilters && (
+                <span className="ml-1 bg-primary-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {selectedTags.length + selectedCuisines.length + selectedMealTypes.length + selectedDietaryLabels.length + (maxCookTime ? 1 : 0) + (sortBy !== 'createdAt' ? 1 : 0)}
+                </span>
+              )}
+            </Button>
+          </form>
+
+          {/* Filter Panel */}
+          {showFilters && (
+            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+              {/* Sort and Cook Time Controls */}
+              <div className="flex flex-wrap gap-4">
+                <div className="flex-1 min-w-[150px]">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => {
+                      setSortBy(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full input"
+                  >
+                    {sortOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Order</label>
+                  <select
+                    value={sortOrder}
+                    onChange={(e) => {
+                      setSortOrder(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full input"
+                  >
+                    <option value="desc">{sortBy === 'title' ? 'Z to A' : 'Newest First'}</option>
+                    <option value="asc">{sortBy === 'title' ? 'A to Z' : 'Oldest First'}</option>
+                  </select>
+                </div>
+                <div className="flex-1 min-w-[150px]">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cook Time</label>
+                  <select
+                    value={maxCookTime}
+                    onChange={(e) => {
+                      setMaxCookTime(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full input"
+                  >
+                    {cookTimeOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Tags */}
+              {availableTags.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Filter by Tags
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableTags.map((tag) => (
+                      <button
+                        key={tag.id}
+                        onClick={() => toggleTag(tag.name)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedTags.includes(tag.name)
+                            ? 'bg-primary-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {tag.name}
+                        <span className="ml-1 opacity-60">({tag.recipe_count})</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Cuisine */}
+              {availableCuisines.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cuisine</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableCuisines.map((cuisine) => (
+                      <button
+                        key={cuisine.id}
+                        onClick={() => toggleCuisine(cuisine.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedCuisines.includes(cuisine.id)
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {cuisine.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Meal Type */}
+              {availableMealTypes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Meal Type</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableMealTypes.map((mealType) => (
+                      <button
+                        key={mealType.id}
+                        onClick={() => toggleMealType(mealType.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedMealTypes.includes(mealType.id)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {mealType.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Dietary */}
+              {availableDietaryLabels.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dietary</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableDietaryLabels.map((dietary) => (
+                      <button
+                        key={dietary.id}
+                        onClick={() => toggleDietaryLabel(dietary.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedDietaryLabels.includes(dietary.id)
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {dietary.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <div className="pt-2 border-t">
+                  <button
+                    onClick={clearFilters}
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  >
+                    Clear all filters
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Active Filters Display (when panel is collapsed) */}
+          {!showFilters && hasActiveFilters && (
+            <div className="flex flex-wrap gap-2 items-center">
+              <span className="text-sm text-gray-500">Active filters:</span>
+              {selectedTags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary-100 text-primary-800"
+                >
+                  {tag}
+                  <button onClick={() => toggleTag(tag)} className="ml-1 hover:text-primary-600">
+                    ×
+                  </button>
+                </span>
+              ))}
+              {selectedCuisines.map((cuisineId) => {
+                const cuisine = availableCuisines.find((c) => c.id === cuisineId);
+                return cuisine ? (
+                  <span
+                    key={cuisineId}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800"
+                  >
+                    {cuisine.name}
+                    <button onClick={() => toggleCuisine(cuisineId)} className="ml-1 hover:text-orange-600">
+                      ×
+                    </button>
+                  </span>
+                ) : null;
+              })}
+              {selectedMealTypes.map((mealTypeId) => {
+                const mealType = availableMealTypes.find((m) => m.id === mealTypeId);
+                return mealType ? (
+                  <span
+                    key={mealTypeId}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
+                  >
+                    {mealType.name}
+                    <button onClick={() => toggleMealType(mealTypeId)} className="ml-1 hover:text-blue-600">
+                      ×
+                    </button>
+                  </span>
+                ) : null;
+              })}
+              {selectedDietaryLabels.map((dietaryId) => {
+                const dietary = availableDietaryLabels.find((d) => d.id === dietaryId);
+                return dietary ? (
+                  <span
+                    key={dietaryId}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800"
+                  >
+                    {dietary.name}
+                    <button onClick={() => toggleDietaryLabel(dietaryId)} className="ml-1 hover:text-green-600">
+                      ×
+                    </button>
+                  </span>
+                ) : null;
+              })}
+              {maxCookTime && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-700">
+                  Under {maxCookTime} min
+                  <button onClick={() => setMaxCookTime('')} className="ml-1 hover:text-gray-600">
+                    ×
+                  </button>
+                </span>
+              )}
+              {sortBy !== 'createdAt' && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-700">
+                  Sorted by {sortOptions.find((o) => o.value === sortBy)?.label}
+                </span>
+              )}
+              <button
+                onClick={clearFilters}
+                className="text-xs text-gray-500 hover:text-gray-700 underline"
+              >
+                Clear all
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Error */}
         {error && (

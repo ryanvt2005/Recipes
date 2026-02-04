@@ -13,6 +13,365 @@
 const { normalizeUnit, parseIngredientString, UNIT_MAP } = require('./ingredientParser');
 
 // ============================================
+// Fuzzy Matching for Typos
+// ============================================
+
+/**
+ * Calculate Levenshtein distance between two strings
+ * @param {string} a - First string
+ * @param {string} b - Second string
+ * @returns {number} Edit distance
+ */
+function levenshteinDistance(a, b) {
+  if (!a || !b) return (a || b || '').length;
+
+  const matrix = [];
+
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1, // insertion
+          matrix[i - 1][j] + 1 // deletion
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+/**
+ * Common ingredient misspellings mapped to correct spelling
+ * Only includes high-confidence, unambiguous corrections
+ */
+const COMMON_MISSPELLINGS = {
+  // Proteins
+  chiken: 'chicken',
+  chickin: 'chicken',
+  chickn: 'chicken',
+  chcken: 'chicken',
+  beaf: 'beef',
+  beek: 'beef',
+  beff: 'beef',
+  prok: 'pork',
+  salman: 'salmon',
+  samlon: 'salmon',
+  samon: 'salmon',
+  shripm: 'shrimp',
+  shirmp: 'shrimp',
+  shrim: 'shrimp',
+  tuna: 'tuna',
+
+  // Vegetables
+  oinon: 'onion',
+  onin: 'onion',
+  onino: 'onion',
+  oniom: 'onion',
+  garlik: 'garlic',
+  garlc: 'garlic',
+  garlick: 'garlic',
+  tomatoe: 'tomato',
+  tommato: 'tomato',
+  tomoto: 'tomato',
+  potatoe: 'potato',
+  pototo: 'potato',
+  potao: 'potato',
+  carott: 'carrot',
+  carot: 'carrot',
+  carrott: 'carrot',
+  cellery: 'celery',
+  celary: 'celery',
+  celey: 'celery',
+  brocoli: 'broccoli',
+  brocolli: 'broccoli',
+  brocolie: 'broccoli',
+  broccolli: 'broccoli',
+  cucmber: 'cucumber',
+  cucubmer: 'cucumber',
+  cumcumber: 'cucumber',
+  zuchini: 'zucchini',
+  zuccini: 'zucchini',
+  zucinni: 'zucchini',
+  zuchinni: 'zucchini',
+  aspargus: 'asparagus',
+  asparagas: 'asparagus',
+  asparugus: 'asparagus',
+  spinich: 'spinach',
+  spinch: 'spinach',
+  spinnach: 'spinach',
+  lettice: 'lettuce',
+  letuce: 'lettuce',
+  lettuse: 'lettuce',
+  mushrom: 'mushroom',
+  mushroon: 'mushroom',
+  mushrom: 'mushroom',
+  avacado: 'avocado',
+  avacodo: 'avocado',
+  avocodo: 'avocado',
+  advocado: 'avocado',
+  jalapeno: 'jalapeño',
+  jalepeno: 'jalapeño',
+  jalepeño: 'jalapeño',
+  jalapenio: 'jalapeño',
+
+  // Herbs
+  parsely: 'parsley',
+  parsley: 'parsley',
+  parsly: 'parsley',
+  parslye: 'parsley',
+  cilantro: 'cilantro',
+  cilanto: 'cilantro',
+  cilantrao: 'cilantro',
+  corriander: 'coriander',
+  coriender: 'coriander',
+  basle: 'basil',
+  basill: 'basil',
+  basal: 'basil',
+  oregeno: 'oregano',
+  oregeno: 'oregano',
+  origano: 'oregano',
+  tyme: 'thyme',
+  thime: 'thyme',
+  rosemery: 'rosemary',
+  rosemry: 'rosemary',
+  rozemary: 'rosemary',
+
+  // Dairy
+  chese: 'cheese',
+  cheeze: 'cheese',
+  chesee: 'cheese',
+  chesse: 'cheese',
+  parmesean: 'parmesan',
+  parmasean: 'parmesan',
+  parmasan: 'parmesan',
+  parmesain: 'parmesan',
+  parmesian: 'parmesan',
+  mozarella: 'mozzarella',
+  mozzerella: 'mozzarella',
+  mozzorella: 'mozzarella',
+  mozerella: 'mozzarella',
+  chedder: 'cheddar',
+  chedar: 'cheddar',
+  cheder: 'cheddar',
+  buuter: 'butter',
+  buttr: 'butter',
+  buter: 'butter',
+  yougart: 'yogurt',
+  yogart: 'yogurt',
+  yougurt: 'yogurt',
+  yoghurt: 'yogurt',
+
+  // Spices
+  cinamon: 'cinnamon',
+  cinnammon: 'cinnamon',
+  cinammon: 'cinnamon',
+  cinnamin: 'cinnamon',
+  peper: 'pepper',
+  pepr: 'pepper',
+  peppr: 'pepper',
+  paprica: 'paprika',
+  paprkia: 'paprika',
+  paprka: 'paprika',
+  tumeric: 'turmeric',
+  termeric: 'turmeric',
+  turmuric: 'turmeric',
+  cunim: 'cumin',
+  cummin: 'cumin',
+  cuminn: 'cumin',
+  nutmeg: 'nutmeg',
+  nutmge: 'nutmeg',
+  giner: 'ginger',
+  gingr: 'ginger',
+  ginjer: 'ginger',
+
+  // Pantry staples
+  flouer: 'flour',
+  flor: 'flour',
+  fleur: 'flour',
+  suger: 'sugar',
+  sugr: 'sugar',
+  suggar: 'sugar',
+  vinager: 'vinegar',
+  vinigar: 'vinegar',
+  vinager: 'vinegar',
+  vineger: 'vinegar',
+  mayonaise: 'mayonnaise',
+  mayonase: 'mayonnaise',
+  mayonnaisse: 'mayonnaise',
+  mayo: 'mayonnaise',
+  katchup: 'ketchup',
+  ketsup: 'ketchup',
+  catsup: 'ketchup',
+  mustrad: 'mustard',
+  mustad: 'mustard',
+  musterd: 'mustard',
+
+  // Fruits
+  strwaberry: 'strawberry',
+  strawbery: 'strawberry',
+  stawberry: 'strawberry',
+  bluberry: 'blueberry',
+  bluebarry: 'blueberry',
+  rasberry: 'raspberry',
+  raspbery: 'raspberry',
+  rasperry: 'raspberry',
+  bannana: 'banana',
+  bananana: 'banana',
+  bananna: 'banana',
+  lemmon: 'lemon',
+  limon: 'lemon',
+  oragne: 'orange',
+  ornage: 'orange',
+  orage: 'orange',
+  aplle: 'apple',
+  appel: 'apple',
+  aple: 'apple',
+  peachs: 'peach',
+  pech: 'peach',
+  mangoe: 'mango',
+  magno: 'mango',
+  pinneapple: 'pineapple',
+  pineaple: 'pineapple',
+  pinapple: 'pineapple',
+
+  // Grains/pasta
+  spagetti: 'spaghetti',
+  spageti: 'spaghetti',
+  spagheti: 'spaghetti',
+  spaghetii: 'spaghetti',
+  maccaroni: 'macaroni',
+  macaronni: 'macaroni',
+  macroni: 'macaroni',
+  lasanga: 'lasagna',
+  lasanga: 'lasagna',
+  lazagna: 'lasagna',
+  lasagne: 'lasagna',
+  rice: 'rice',
+  ryce: 'rice',
+
+  // Misc
+  worchestershire: 'worcestershire',
+  worcestshire: 'worcestershire',
+  worsestershire: 'worcestershire',
+  wostershire: 'worcestershire',
+  sourcream: 'sour cream',
+  sourcreme: 'sour cream',
+};
+
+/**
+ * Correct common misspellings in ingredient text
+ * @param {string} text - Ingredient text (lowercase)
+ * @returns {{ corrected: string, wasCorrected: boolean, original?: string }}
+ */
+function correctMisspelling(text) {
+  if (!text) return { corrected: text, wasCorrected: false };
+
+  const words = text.split(/\s+/);
+  let wasCorrected = false;
+  const original = text;
+
+  const correctedWords = words.map((word) => {
+    // Check direct misspelling match
+    if (COMMON_MISSPELLINGS[word]) {
+      wasCorrected = true;
+      return COMMON_MISSPELLINGS[word];
+    }
+    return word;
+  });
+
+  const corrected = correctedWords.join(' ');
+  return {
+    corrected,
+    wasCorrected,
+    original: wasCorrected ? original : undefined,
+  };
+}
+
+/**
+ * Find a fuzzy match for an ingredient name against known ingredient families
+ * Uses misspelling dictionary first, then conservative Levenshtein matching
+ *
+ * Strategy:
+ * 1. Check misspelling dictionary (high confidence corrections)
+ * 2. Try to match corrected text to ingredient families
+ * 3. If no family match but was corrected, return the corrected spelling
+ * 4. Only use Levenshtein for very close matches (distance 1) on longer words
+ *
+ * @param {string} text - Ingredient text (lowercase, modifiers stripped)
+ * @returns {{ canonical: string, display: string, distance: number, correctedFrom?: string } | null}
+ */
+function fuzzyMatchIngredientFamily(text) {
+  if (!text || text.length < 4) return null; // Don't fuzzy match very short strings
+
+  // Step 1: Try to correct common misspellings (high confidence)
+  const { corrected, wasCorrected } = correctMisspelling(text);
+
+  if (wasCorrected) {
+    // Try exact match with corrected spelling against ingredient families
+    const exactMatch = matchIngredientFamily(corrected);
+    if (exactMatch) {
+      return { ...exactMatch, distance: 0, correctedFrom: text };
+    }
+
+    // Even if no family match, return the corrected spelling
+    // This handles cases like "chiken" → "chicken" (which isn't a family but is correct)
+    return {
+      canonical: corrected,
+      display: capitalizeFirst(corrected),
+      distance: 0,
+      correctedFrom: text,
+    };
+  }
+
+  // Step 2: Conservative Levenshtein matching
+  // Only use for longer words (6+ chars) with distance of exactly 1
+  // This avoids false positives like "berries" → "cherries"
+  if (text.length < 6) return null;
+
+  const canonicalNames = new Set();
+  for (const mapping of INGREDIENT_FAMILY_MAP) {
+    canonicalNames.add(mapping.canonical);
+  }
+
+  let bestMatch = null;
+  let bestDistance = Infinity;
+  const maxDistance = 1; // Very conservative - only 1 edit allowed
+
+  for (const canonical of canonicalNames) {
+    // Skip if length difference is too large
+    if (Math.abs(text.length - canonical.length) > maxDistance) {
+      continue;
+    }
+
+    const distance = levenshteinDistance(text, canonical);
+
+    if (distance === 1 && distance < bestDistance) {
+      bestDistance = distance;
+      const mapping = INGREDIENT_FAMILY_MAP.find((m) => m.canonical === canonical);
+      bestMatch = {
+        canonical,
+        display: mapping?.display || capitalizeFirst(canonical),
+        distance,
+      };
+    }
+  }
+
+  return bestMatch;
+}
+
+// ============================================
 // Unit Compatibility
 // ============================================
 
@@ -1744,7 +2103,25 @@ function normalizeIngredientName(nameOrText) {
     }
   }
 
-  // Step 8: "and" → "&" normalization for short ingredient conjunctions
+  // Step 8: FUZZY MATCHING for typos
+  // Try to correct misspellings and find close matches
+  // Only try fuzzy matching on the fully stripped text to avoid false positives
+  const textForFuzzy = fullyStripped.length > 0 ? fullyStripped : lower;
+  const fuzzyMatch = fuzzyMatchIngredientFamily(textForFuzzy);
+  if (fuzzyMatch) {
+    return {
+      canonicalKey: fuzzyMatch.canonical,
+      displayName: fuzzyMatch.display,
+      attributes: {
+        familyMatched: true,
+        fuzzyMatched: true,
+        editDistance: fuzzyMatch.distance,
+        correctedFrom: fuzzyMatch.correctedFrom,
+      },
+    };
+  }
+
+  // Step 9: "and" → "&" normalization for short ingredient conjunctions
   // Only apply to patterns like "X and Y" where X and Y are short words
   const andPattern = /^(\w{2,12})\s+and\s+(\w{2,12})$/i;
   const andMatch = lower.match(andPattern);
@@ -2277,6 +2654,12 @@ module.exports = {
   stripPrepModifiers,
   stripQualityModifiers,
   matchIngredientFamily,
+  // Fuzzy matching exports
+  levenshteinDistance,
+  correctMisspelling,
+  fuzzyMatchIngredientFamily,
+  COMMON_MISSPELLINGS,
+  // Constants
   COMPOUND_NORMALIZATIONS,
   UNIT_CONVERSION,
   MODIFIER_PATTERNS,

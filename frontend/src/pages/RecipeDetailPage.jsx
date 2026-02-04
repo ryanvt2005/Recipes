@@ -477,18 +477,66 @@ export default function RecipeDetailPage() {
           </div>
         )}
 
+        {/* Categories */}
+        {(recipe.cuisines?.length > 0 || recipe.mealTypes?.length > 0 || recipe.dietaryLabels?.length > 0) && (
+          <div className="mb-8 flex flex-wrap gap-2">
+            {recipe.cuisines?.map((cuisine) => (
+              <span
+                key={cuisine.id}
+                className="inline-block bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm"
+              >
+                {cuisine.name}
+              </span>
+            ))}
+            {recipe.mealTypes?.map((mealType) => (
+              <span
+                key={mealType.id}
+                className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+              >
+                {mealType.name}
+              </span>
+            ))}
+            {recipe.dietaryLabels?.map((dietary) => (
+              <span
+                key={dietary.id}
+                className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm"
+              >
+                {dietary.name}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Content Grid */}
         <div className="grid md:grid-cols-5 gap-8">
           {/* Ingredients */}
           <div className="md:col-span-2 card">
             <h2 className="text-2xl font-bold mb-4">Ingredients</h2>
             <ul className="space-y-2">
-              {recipe.ingredients.map((ingredient, index) => (
-                <li key={ingredient.id || index} className="flex items-start">
-                  <input type="checkbox" className="mt-1 mr-3 h-4 w-4 text-primary-600 rounded" />
-                  <span className="text-gray-700">{formatQuantity(ingredient)}</span>
-                </li>
-              ))}
+              {(() => {
+                let lastGroup = null;
+                return recipe.ingredients.map((ingredient, index) => {
+                  const showGroupHeader = ingredient.ingredientGroup && ingredient.ingredientGroup !== lastGroup;
+                  lastGroup = ingredient.ingredientGroup;
+
+                  return (
+                    <li key={ingredient.id || index}>
+                      {showGroupHeader && (
+                        <div className="flex items-center gap-2 mt-4 mb-2 first:mt-0">
+                          <span className="text-sm font-semibold text-primary-700 bg-primary-50 px-3 py-1 rounded-full">
+                            {ingredient.ingredientGroup}
+                          </span>
+                          <div className="flex-1 h-px bg-gray-200"></div>
+                        </div>
+                      )}
+                      <div className="flex items-start">
+                        <input type="checkbox" className="mt-1 mr-3 h-4 w-4 text-primary-600 rounded" />
+                        <span className="text-gray-700">{formatQuantity(ingredient)}</span>
+                      </div>
+                    </li>
+                  );
+                });
+              })()}
             </ul>
           </div>
 

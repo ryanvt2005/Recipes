@@ -17,6 +17,10 @@ const {
   detectBellPepper,
   stripModifiers,
   matchIngredientFamily,
+  levenshteinDistance,
+  correctMisspelling,
+  fuzzyMatchIngredientFamily,
+  COMMON_MISSPELLINGS,
 } = require('../src/utils/ingredientAggregator');
 
 // ============================================
@@ -683,5 +687,171 @@ describe('detectBellPepper', () => {
     expect(detectBellPepper('pepper')).toBeNull();
     expect(detectBellPepper('cayenne pepper')).toBeNull();
     expect(detectBellPepper('jalapeño pepper')).toBeNull();
+  });
+});
+
+// ============================================
+// Fuzzy Matching Tests
+// ============================================
+
+describe('levenshteinDistance', () => {
+  it('should return 0 for identical strings', () => {
+    expect(levenshteinDistance('chicken', 'chicken')).toBe(0);
+    expect(levenshteinDistance('', '')).toBe(0);
+  });
+
+  it('should return correct distance for single character edits', () => {
+    expect(levenshteinDistance('chicken', 'chiken')).toBe(1); // deletion
+    expect(levenshteinDistance('chicken', 'chickens')).toBe(1); // insertion
+    expect(levenshteinDistance('chicken', 'chickun')).toBe(1); // substitution
+  });
+
+  it('should return correct distance for multiple edits', () => {
+    expect(levenshteinDistance('chicken', 'chikn')).toBe(2);
+    expect(levenshteinDistance('parsley', 'parsly')).toBe(1);
+  });
+
+  it('should handle empty strings', () => {
+    expect(levenshteinDistance('', 'test')).toBe(4);
+    expect(levenshteinDistance('test', '')).toBe(4);
+  });
+});
+
+describe('correctMisspelling', () => {
+  it('should correct common protein misspellings', () => {
+    expect(correctMisspelling('chiken').corrected).toBe('chicken');
+    expect(correctMisspelling('beaf').corrected).toBe('beef');
+    expect(correctMisspelling('salman').corrected).toBe('salmon');
+    expect(correctMisspelling('shripm').corrected).toBe('shrimp');
+  });
+
+  it('should correct common vegetable misspellings', () => {
+    expect(correctMisspelling('oinon').corrected).toBe('onion');
+    expect(correctMisspelling('garlik').corrected).toBe('garlic');
+    expect(correctMisspelling('tomatoe').corrected).toBe('tomato');
+    expect(correctMisspelling('brocoli').corrected).toBe('broccoli');
+    expect(correctMisspelling('avacado').corrected).toBe('avocado');
+  });
+
+  it('should correct common herb misspellings', () => {
+    expect(correctMisspelling('parsely').corrected).toBe('parsley');
+    expect(correctMisspelling('basle').corrected).toBe('basil');
+    expect(correctMisspelling('oregeno').corrected).toBe('oregano');
+    expect(correctMisspelling('rosemery').corrected).toBe('rosemary');
+  });
+
+  it('should correct common dairy misspellings', () => {
+    expect(correctMisspelling('chese').corrected).toBe('cheese');
+    expect(correctMisspelling('parmesean').corrected).toBe('parmesan');
+    expect(correctMisspelling('mozarella').corrected).toBe('mozzarella');
+    expect(correctMisspelling('buuter').corrected).toBe('butter');
+  });
+
+  it('should correct common spice misspellings', () => {
+    expect(correctMisspelling('cinamon').corrected).toBe('cinnamon');
+    expect(correctMisspelling('peper').corrected).toBe('pepper');
+    expect(correctMisspelling('tumeric').corrected).toBe('turmeric');
+    expect(correctMisspelling('cummin').corrected).toBe('cumin');
+  });
+
+  it('should set wasCorrected flag appropriately', () => {
+    const corrected = correctMisspelling('chiken');
+    expect(corrected.wasCorrected).toBe(true);
+    expect(corrected.original).toBe('chiken');
+
+    const notCorrected = correctMisspelling('chicken');
+    expect(notCorrected.wasCorrected).toBe(false);
+    expect(notCorrected.original).toBeUndefined();
+  });
+
+  it('should correct words within phrases', () => {
+    const result = correctMisspelling('diced chiken breast');
+    expect(result.corrected).toBe('diced chicken breast');
+    expect(result.wasCorrected).toBe(true);
+  });
+});
+
+describe('fuzzyMatchIngredientFamily', () => {
+  it('should correct misspellings from dictionary', () => {
+    const match = fuzzyMatchIngredientFamily('chiken');
+    expect(match).not.toBeNull();
+    expect(match.canonical).toBe('chicken');
+    expect(match.correctedFrom).toBe('chiken');
+  });
+
+  it('should match misspellings to ingredient families when possible', () => {
+    // "avacado" corrects to "avocado" which is in ingredient families
+    const match = fuzzyMatchIngredientFamily('avacado');
+    expect(match).not.toBeNull();
+    expect(match.canonical).toBe('avocado');
+  });
+
+  it('should not match very short strings', () => {
+    expect(fuzzyMatchIngredientFamily('egg')).toBeNull(); // too short
+    expect(fuzzyMatchIngredientFamily('a')).toBeNull();
+  });
+
+  it('should not match unrelated words', () => {
+    // "table" is not close to any ingredient
+    expect(fuzzyMatchIngredientFamily('table')).toBeNull();
+    expect(fuzzyMatchIngredientFamily('computer')).toBeNull();
+  });
+
+  it('should not incorrectly match similar words', () => {
+    // "berries" should NOT match to "cherries" - too risky
+    expect(fuzzyMatchIngredientFamily('berries')).toBeNull();
+  });
+
+  it('should include edit distance in result', () => {
+    const match = fuzzyMatchIngredientFamily('parsely');
+    expect(match).not.toBeNull();
+    expect(match.distance).toBe(0); // Dictionary correction has distance 0
+  });
+});
+
+describe('normalizeIngredientName with fuzzy matching', () => {
+  it('should correct "chiken breast" to chicken breast', () => {
+    const result = normalizeIngredientName('chiken breast');
+    expect(result.canonicalKey).toBe('chicken breast');
+    expect(result.attributes.fuzzyMatched).toBe(true);
+  });
+
+  it('should correct "parsely" to parsley family', () => {
+    const result = normalizeIngredientName('parsely');
+    expect(result.canonicalKey).toBe('parsley');
+    expect(result.attributes.fuzzyMatched).toBe(true);
+  });
+
+  it('should correct "mozarella" to mozzarella cheese', () => {
+    const result = normalizeIngredientName('mozarella');
+    expect(result.canonicalKey).toBe('mozzarella cheese');
+    expect(result.attributes.fuzzyMatched).toBe(true);
+  });
+
+  it('should correct "avacado" to avocado', () => {
+    const result = normalizeIngredientName('avacado');
+    expect(result.canonicalKey).toBe('avocado');
+    expect(result.attributes.fuzzyMatched).toBe(true);
+  });
+
+  it('should correct "cinamon" to cinnamon', () => {
+    const result = normalizeIngredientName('cinamon');
+    expect(result.canonicalKey).toBe('cinnamon');
+    expect(result.attributes.fuzzyMatched).toBe(true);
+  });
+
+  it('should NOT fuzzy match "berries" to "cherries"', () => {
+    // This should singularize to "berry", not fuzzy match to "cherries"
+    const result = normalizeIngredientName('berries');
+    expect(result.canonicalKey).toBe('berry');
+    expect(result.attributes.fuzzyMatched).toBeUndefined();
+  });
+
+  it('should prefer exact matches over fuzzy matches', () => {
+    // "chicken breast" should match exactly via family
+    const result = normalizeIngredientName('chicken breast');
+    expect(result.canonicalKey).toBe('chicken breast');
+    expect(result.attributes.fuzzyMatched).toBeUndefined();
+    expect(result.attributes.familyMatched).toBe(true);
   });
 });

@@ -24,9 +24,37 @@ export default function AddRecipePage() {
   const [extractedRecipe, setExtractedRecipe] = useState(null);
   const [extractionStatus, setExtractionStatus] = useState('');
   const [extractionMeta, setExtractionMeta] = useState(null); // Stores quality score, method, cached
+  const [duplicateRecipe, setDuplicateRecipe] = useState(null); // Stores existing recipe if duplicate URL
+
+  // Category state
+  const [availableCuisines, setAvailableCuisines] = useState([]);
+  const [availableMealTypes, setAvailableMealTypes] = useState([]);
+  const [availableDietaryLabels, setAvailableDietaryLabels] = useState([]);
+  const [selectedCuisines, setSelectedCuisines] = useState([]);
+  const [selectedMealTypes, setSelectedMealTypes] = useState([]);
+  const [selectedDietaryLabels, setSelectedDietaryLabels] = useState([]);
 
   const navigate = useNavigate();
   const statusIntervalRef = useRef(null);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const [cuisinesRes, mealTypesRes, dietaryRes] = await Promise.all([
+          recipes.getCuisines(),
+          recipes.getMealTypes(),
+          recipes.getDietaryLabels(),
+        ]);
+        setAvailableCuisines(cuisinesRes.data.cuisines || []);
+        setAvailableMealTypes(mealTypesRes.data.mealTypes || []);
+        setAvailableDietaryLabels(dietaryRes.data.dietaryLabels || []);
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const handleStartManual = () => {
     setExtractedRecipe({
@@ -47,6 +75,7 @@ export default function AddRecipePage() {
   const handleExtract = async (e) => {
     e.preventDefault();
     setError('');
+    setDuplicateRecipe(null);
     setExtracting(true);
     setExtractionStatus(EXTRACTION_MESSAGES[0]);
     setExtractionMeta(null);
@@ -77,7 +106,12 @@ export default function AddRecipePage() {
 
       setExtractedRecipe(recipe);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to extract recipe from URL');
+      if (err.response?.status === 409 && err.response?.data?.details?.existingRecipe) {
+        setDuplicateRecipe(err.response.data.details.existingRecipe);
+        setError('You already have this recipe saved.');
+      } else {
+        setError(err.response?.data?.message || 'Failed to extract recipe from URL');
+      }
     } finally {
       if (statusIntervalRef.current) {
         clearInterval(statusIntervalRef.current);
@@ -127,6 +161,11 @@ export default function AddRecipePage() {
       delete recipeData.cached;
       delete recipeData.extractionMethod;
       delete recipeData.extractionQuality;
+
+      // Add categories
+      recipeData.cuisines = selectedCuisines;
+      recipeData.mealTypes = selectedMealTypes;
+      recipeData.dietaryLabels = selectedDietaryLabels;
 
       const response = await recipes.create(recipeData);
       navigate(`/recipes/${response.data.recipe.id}`);
@@ -234,9 +273,49 @@ export default function AddRecipePage() {
                 required
               />
 
-              {error && (
+              {error && !duplicateRecipe && (
                 <div className="rounded-md bg-red-50 p-4">
                   <p className="text-sm text-red-800">{error}</p>
+                </div>
+              )}
+
+              {duplicateRecipe && (
+                <div className="rounded-md bg-yellow-50 border border-yellow-200 p-4">
+                  <div className="flex items-start gap-3">
+                    {duplicateRecipe.imageUrl && (
+                      <img
+                        src={duplicateRecipe.imageUrl}
+                        alt={duplicateRecipe.title}
+                        className="w-16 h-16 object-cover rounded"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-yellow-800">{duplicateRecipe.title}</h4>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Saved on {new Date(duplicateRecipe.createdAt).toLocaleDateString()}
+                      </p>
+                      <div className="mt-3 flex gap-2">
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(`/recipes/${duplicateRecipe.id}`)}
+                        >
+                          View Recipe
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            setDuplicateRecipe(null);
+                            setError('');
+                            setUrl('');
+                          }}
+                        >
+                          Try Different URL
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -398,26 +477,59 @@ export default function AddRecipePage() {
                 </Button>
               </div>
               <div className="space-y-3">
-                {extractedRecipe.ingredients.map((ingredient, index) => (
-                  <div key={index} className="flex gap-2 items-start">
-                    <Input
-                      value={ingredient.rawText || ingredient.ingredient}
-                      onChange={(e) => handleIngredientChange(index, 'rawText', e.target.value)}
-                      placeholder="e.g., 2 cups flour"
-                      className="flex-1 !mb-0"
-                    />
-                    {extractedRecipe.ingredients.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeIngredient(index)}
-                        className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
-                        aria-label="Remove ingredient"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
+                {(() => {
+                  // Group ingredients by their group field for display
+                  let lastGroup = null;
+                  return extractedRecipe.ingredients.map((ingredient, index) => {
+                    // Build display value from parsed components (clean, without section headers)
+                    const displayValue = (() => {
+                      if (ingredient.group && ingredient.ingredient) {
+                        const parts = [];
+                        if (ingredient.quantity) parts.push(ingredient.quantity);
+                        if (ingredient.unit) parts.push(ingredient.unit);
+                        parts.push(ingredient.ingredient);
+                        if (ingredient.preparation) parts.push(`, ${ingredient.preparation}`);
+                        return parts.join(' ');
+                      }
+                      return ingredient.rawText || ingredient.ingredient;
+                    })();
+
+                    // Check if we need to show a new group header
+                    const showGroupHeader = ingredient.group && ingredient.group !== lastGroup;
+                    lastGroup = ingredient.group;
+
+                    return (
+                      <div key={index}>
+                        {showGroupHeader && (
+                          <div className="flex items-center gap-2 mt-4 mb-2 first:mt-0">
+                            <span className="text-sm font-semibold text-primary-700 bg-primary-50 px-3 py-1 rounded-full">
+                              {ingredient.group}
+                            </span>
+                            <div className="flex-1 h-px bg-gray-200"></div>
+                          </div>
+                        )}
+                        <div className="flex gap-2 items-start">
+                          <Input
+                            value={displayValue}
+                            onChange={(e) => handleIngredientChange(index, 'rawText', e.target.value)}
+                            placeholder="e.g., 2 cups flour"
+                            className="flex-1 !mb-0"
+                          />
+                          {extractedRecipe.ingredients.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeIngredient(index)}
+                              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                              aria-label="Remove ingredient"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
             </div>
 
@@ -455,6 +567,98 @@ export default function AddRecipePage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Categories */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Categories (Optional)</h3>
+
+              {/* Cuisine */}
+              {availableCuisines.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cuisine</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableCuisines.map((cuisine) => (
+                      <button
+                        key={cuisine.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedCuisines((prev) =>
+                            prev.includes(cuisine.id)
+                              ? prev.filter((c) => c !== cuisine.id)
+                              : [...prev, cuisine.id]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedCuisines.includes(cuisine.id)
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {cuisine.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Meal Type */}
+              {availableMealTypes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Meal Type</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableMealTypes.map((mealType) => (
+                      <button
+                        key={mealType.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedMealTypes((prev) =>
+                            prev.includes(mealType.id)
+                              ? prev.filter((m) => m !== mealType.id)
+                              : [...prev, mealType.id]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedMealTypes.includes(mealType.id)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {mealType.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Dietary */}
+              {availableDietaryLabels.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dietary</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableDietaryLabels.map((dietary) => (
+                      <button
+                        key={dietary.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedDietaryLabels((prev) =>
+                            prev.includes(dietary.id)
+                              ? prev.filter((d) => d !== dietary.id)
+                              : [...prev, dietary.id]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedDietaryLabels.includes(dietary.id)
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {dietary.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Save Button */}

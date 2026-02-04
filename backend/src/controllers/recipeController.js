@@ -1,5 +1,5 @@
 const pool = require('../config/database');
-const { extractRecipe, RecipeExtractionError } = require('../services/recipeExtractionService');
+const { extractRecipe, RecipeExtractionError, normalizeUrl } = require('../services/recipeExtractionService');
 const logger = require('../config/logger');
 const { scaleRecipe } = require('../utils/recipeScaling');
 const { ErrorCodes, sendError, errors } = require('../utils/errorResponse');
@@ -37,8 +37,31 @@ async function getIngredientsForRecipes(req, res) {
  */
 async function extractRecipeFromUrl(req, res) {
   const { url } = req.body;
+  const userId = req.user.userId;
 
   try {
+    // Check for duplicate before extraction
+    const normalizedUrl = normalizeUrl(url);
+    const existing = await pool.query(
+      `SELECT id, title, image_url, created_at
+       FROM recipes
+       WHERE user_id = $1 AND source_url = $2`,
+      [userId, normalizedUrl]
+    );
+
+    if (existing.rows.length > 0) {
+      return sendError(res, 409, ErrorCodes.DUPLICATE_RECIPE,
+        'You already have this recipe saved', {
+          existingRecipe: {
+            id: existing.rows[0].id,
+            title: existing.rows[0].title,
+            imageUrl: existing.rows[0].image_url,
+            createdAt: existing.rows[0].created_at
+          }
+        }
+      );
+    }
+
     const recipe = await extractRecipe(url);
 
     res.status(200).json({ recipe });
@@ -79,6 +102,9 @@ async function saveRecipe(req, res) {
     instructions,
     tags,
     extractionMethod,
+    cuisines,
+    mealTypes,
+    dietaryLabels,
   } = req.body;
 
   const client = await pool.connect();
@@ -159,6 +185,39 @@ async function saveRecipe(req, res) {
       }
     }
 
+    // Insert cuisines
+    if (cuisines && cuisines.length > 0) {
+      for (const cuisineId of cuisines) {
+        await client.query(
+          `INSERT INTO recipe_cuisines (recipe_id, cuisine_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [recipe.id, cuisineId]
+        );
+      }
+    }
+
+    // Insert meal types
+    if (mealTypes && mealTypes.length > 0) {
+      for (const mealTypeId of mealTypes) {
+        await client.query(
+          `INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [recipe.id, mealTypeId]
+        );
+      }
+    }
+
+    // Insert dietary labels
+    if (dietaryLabels && dietaryLabels.length > 0) {
+      for (const dietaryLabelId of dietaryLabels) {
+        await client.query(
+          `INSERT INTO recipe_dietary_labels (recipe_id, dietary_label_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [recipe.id, dietaryLabelId]
+        );
+      }
+    }
+
     await client.query('COMMIT');
 
     // Fetch complete recipe with relationships
@@ -188,15 +247,19 @@ async function getRecipes(req, res) {
     tags = '',
     sortBy = 'createdAt',
     sortOrder = 'desc',
+    maxCookTime = '',
+    cuisines = '',
+    mealTypes = '',
+    dietaryLabels = '',
   } = req.query;
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
-  const validSortBy = ['createdAt', 'title', 'updatedAt'].includes(sortBy) ? sortBy : 'createdAt';
+  const validSortBy = ['createdAt', 'title', 'updatedAt', 'cookTime', 'totalTime'].includes(sortBy) ? sortBy : 'createdAt';
   const validSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
 
   try {
     let query = `
-      SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.total_time, r.created_at
+      SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.cook_time, r.total_time, r.created_at
       FROM recipes r
       WHERE r.user_id = $1
     `;
@@ -224,10 +287,71 @@ async function getRecipes(req, res) {
       params.push(tagArray);
     }
 
+    // Add cook time filter (handles ISO 8601 PT format and "X minutes" format)
+    if (maxCookTime) {
+      const maxMinutes = parseInt(maxCookTime);
+      if (!isNaN(maxMinutes) && maxMinutes > 0) {
+        paramCount++;
+        // Filter recipes where cook_time can be parsed and is <= maxMinutes
+        // Handles: "30 minutes", "1 hour", "PT30M", "PT1H", "PT1H30M"
+        query += ` AND (
+          -- "X minutes" or "X minute" format
+          (r.cook_time ~* '^[0-9]+ *min' AND
+           CAST(REGEXP_REPLACE(r.cook_time, '[^0-9].*', '', 'g') AS INTEGER) <= $${paramCount})
+          OR
+          -- "X hours" or "X hour" format (convert to minutes, assume no additional minutes)
+          (r.cook_time ~* '^[0-9]+ *hour' AND
+           CAST(REGEXP_REPLACE(r.cook_time, '[^0-9].*', '', 'g') AS INTEGER) * 60 <= $${paramCount})
+          OR
+          -- ISO 8601 PT format with minutes only (e.g., PT30M)
+          (r.cook_time ~* '^PT[0-9]+M$' AND
+           CAST(REGEXP_REPLACE(r.cook_time, '[^0-9]', '', 'g') AS INTEGER) <= $${paramCount})
+          OR
+          -- ISO 8601 PT format with hours only (e.g., PT1H)
+          (r.cook_time ~* '^PT[0-9]+H$' AND
+           CAST(REGEXP_REPLACE(r.cook_time, '[^0-9]', '', 'g') AS INTEGER) * 60 <= $${paramCount})
+        )`;
+        params.push(maxMinutes);
+      }
+    }
+
+    // Add cuisines filter
+    if (cuisines) {
+      const cuisineArray = cuisines.split(',').map((c) => c.trim());
+      paramCount++;
+      query += ` AND EXISTS (
+        SELECT 1 FROM recipe_cuisines rc
+        WHERE rc.recipe_id = r.id AND rc.cuisine_id = ANY($${paramCount})
+      )`;
+      params.push(cuisineArray);
+    }
+
+    // Add meal types filter
+    if (mealTypes) {
+      const mealTypeArray = mealTypes.split(',').map((m) => m.trim());
+      paramCount++;
+      query += ` AND EXISTS (
+        SELECT 1 FROM recipe_meal_types rm
+        WHERE rm.recipe_id = r.id AND rm.meal_type_id = ANY($${paramCount})
+      )`;
+      params.push(mealTypeArray);
+    }
+
+    // Add dietary labels filter
+    if (dietaryLabels) {
+      const dietaryLabelArray = dietaryLabels.split(',').map((d) => d.trim());
+      paramCount++;
+      query += ` AND EXISTS (
+        SELECT 1 FROM recipe_dietary_labels rd
+        WHERE rd.recipe_id = r.id AND rd.dietary_label_id = ANY($${paramCount})
+      )`;
+      params.push(dietaryLabelArray);
+    }
+
     // Get total count
     const countResult = await pool.query(
       query.replace(
-        'SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.total_time, r.created_at',
+        'SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.cook_time, r.total_time, r.created_at',
         'SELECT COUNT(DISTINCT r.id)'
       ),
       params
@@ -240,7 +364,11 @@ async function getRecipes(req, res) {
         ? 'r.created_at'
         : validSortBy === 'updatedAt'
           ? 'r.updated_at'
-          : 'r.title';
+          : validSortBy === 'cookTime'
+            ? 'r.cook_time'
+            : validSortBy === 'totalTime'
+              ? 'r.total_time'
+              : 'r.title';
     query += ` ORDER BY ${sortColumn} ${validSortOrder}`;
     query += ` LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     params.push(parseInt(limit), offset);
@@ -264,6 +392,7 @@ async function getRecipes(req, res) {
           description: recipe.description,
           imageUrl: recipe.image_url,
           servings: recipe.servings,
+          cookTime: recipe.cook_time,
           totalTime: recipe.total_time,
           tags: tagsResult.rows.map((t) => t.name),
           createdAt: recipe.created_at,
@@ -343,6 +472,30 @@ async function getRecipeById(recipeId, userId) {
     [recipeId]
   );
 
+  // Get cuisines
+  const cuisinesResult = await pool.query(
+    `SELECT c.id, c.name FROM cuisines c
+     JOIN recipe_cuisines rc ON c.id = rc.cuisine_id
+     WHERE rc.recipe_id = $1`,
+    [recipeId]
+  );
+
+  // Get meal types
+  const mealTypesResult = await pool.query(
+    `SELECT m.id, m.name FROM meal_types m
+     JOIN recipe_meal_types rm ON m.id = rm.meal_type_id
+     WHERE rm.recipe_id = $1`,
+    [recipeId]
+  );
+
+  // Get dietary labels
+  const dietaryLabelsResult = await pool.query(
+    `SELECT d.id, d.name FROM dietary_labels d
+     JOIN recipe_dietary_labels rd ON d.id = rd.dietary_label_id
+     WHERE rd.recipe_id = $1`,
+    [recipeId]
+  );
+
   return {
     id: recipe.id,
     userId: recipe.user_id,
@@ -373,6 +526,9 @@ async function getRecipeById(recipeId, userId) {
       instructionText: i.instruction_text,
     })),
     tags: tagsResult.rows,
+    cuisines: cuisinesResult.rows,
+    mealTypes: mealTypesResult.rows,
+    dietaryLabels: dietaryLabelsResult.rows,
   };
 }
 
@@ -394,6 +550,9 @@ async function updateRecipe(req, res) {
     ingredients,
     instructions,
     tags,
+    cuisines,
+    mealTypes,
+    dietaryLabels,
   } = req.body;
 
   const client = await pool.connect();
@@ -522,6 +681,39 @@ async function updateRecipe(req, res) {
       }
     }
 
+    // Update cuisines if provided
+    if (cuisines) {
+      await client.query('DELETE FROM recipe_cuisines WHERE recipe_id = $1', [recipeId]);
+      for (const cuisineId of cuisines) {
+        await client.query(
+          `INSERT INTO recipe_cuisines (recipe_id, cuisine_id) VALUES ($1, $2)`,
+          [recipeId, cuisineId]
+        );
+      }
+    }
+
+    // Update meal types if provided
+    if (mealTypes) {
+      await client.query('DELETE FROM recipe_meal_types WHERE recipe_id = $1', [recipeId]);
+      for (const mealTypeId of mealTypes) {
+        await client.query(
+          `INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)`,
+          [recipeId, mealTypeId]
+        );
+      }
+    }
+
+    // Update dietary labels if provided
+    if (dietaryLabels) {
+      await client.query('DELETE FROM recipe_dietary_labels WHERE recipe_id = $1', [recipeId]);
+      for (const dietaryLabelId of dietaryLabels) {
+        await client.query(
+          `INSERT INTO recipe_dietary_labels (recipe_id, dietary_label_id) VALUES ($1, $2)`,
+          [recipeId, dietaryLabelId]
+        );
+      }
+    }
+
     await client.query('COMMIT');
 
     // Fetch updated recipe
@@ -601,6 +793,76 @@ async function deleteRecipe(req, res) {
   }
 }
 
+/**
+ * Get all tags used by the user's recipes
+ */
+async function getUserTags(req, res) {
+  const userId = req.user.userId;
+
+  try {
+    const result = await pool.query(
+      `SELECT DISTINCT t.id, t.name, COUNT(rt.recipe_id)::int as recipe_count
+       FROM tags t
+       INNER JOIN recipe_tags rt ON t.id = rt.tag_id
+       INNER JOIN recipes r ON rt.recipe_id = r.id
+       WHERE r.user_id = $1
+       GROUP BY t.id, t.name
+       ORDER BY t.name`,
+      [userId]
+    );
+
+    res.status(200).json({ tags: result.rows });
+  } catch (error) {
+    logger.error('Get user tags error', { error: error.message });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch tags');
+  }
+}
+
+/**
+ * Get all cuisines
+ */
+async function getCuisines(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name FROM cuisines ORDER BY sort_order, name`
+    );
+    res.status(200).json({ cuisines: result.rows });
+  } catch (error) {
+    logger.error('Get cuisines error', { error: error.message });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch cuisines');
+  }
+}
+
+/**
+ * Get all meal types
+ */
+async function getMealTypes(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name FROM meal_types ORDER BY sort_order, name`
+    );
+    res.status(200).json({ mealTypes: result.rows });
+  } catch (error) {
+    logger.error('Get meal types error', { error: error.message });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch meal types');
+  }
+}
+
+/**
+ * Get all dietary labels
+ */
+async function getDietaryLabels(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name FROM dietary_labels ORDER BY sort_order, name`
+    );
+    res.status(200).json({ dietaryLabels: result.rows });
+  } catch (error) {
+    logger.error('Get dietary labels error', { error: error.message });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch dietary labels');
+  }
+}
+
 module.exports = {
   extractRecipeFromUrl,
   saveRecipe,
@@ -610,4 +872,8 @@ module.exports = {
   updateRecipe,
   deleteRecipe,
   getIngredientsForRecipes,
+  getUserTags,
+  getCuisines,
+  getMealTypes,
+  getDietaryLabels,
 };

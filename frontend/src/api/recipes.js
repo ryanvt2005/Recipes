@@ -84,6 +84,30 @@ export const recipesApi = {
    * @returns {Promise} - Response with ingredients array
    */
   getIngredientsForRecipes: (recipeIds) => http.post('/recipes/ingredients-preview', { recipeIds }),
+
+  /**
+   * Get all tags used by the current user's recipes
+   * @returns {Promise} - Response with tags array including recipe counts
+   */
+  getTags: () => http.get('/recipes/tags'),
+
+  /**
+   * Get all available cuisines
+   * @returns {Promise} - Response with cuisines array
+   */
+  getCuisines: () => http.get('/recipes/cuisines'),
+
+  /**
+   * Get all available meal types
+   * @returns {Promise} - Response with mealTypes array
+   */
+  getMealTypes: () => http.get('/recipes/meal-types'),
+
+  /**
+   * Get all available dietary labels
+   * @returns {Promise} - Response with dietaryLabels array
+   */
+  getDietaryLabels: () => http.get('/recipes/dietary-labels'),
 };
 
 export default recipesApi;
