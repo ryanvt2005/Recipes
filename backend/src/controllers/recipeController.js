@@ -102,6 +102,9 @@ async function saveRecipe(req, res) {
     instructions,
     tags,
     extractionMethod,
+    cuisines,
+    mealTypes,
+    dietaryLabels,
   } = req.body;
 
   const client = await pool.connect();
@@ -182,6 +185,39 @@ async function saveRecipe(req, res) {
       }
     }
 
+    // Insert cuisines
+    if (cuisines && cuisines.length > 0) {
+      for (const cuisineId of cuisines) {
+        await client.query(
+          `INSERT INTO recipe_cuisines (recipe_id, cuisine_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [recipe.id, cuisineId]
+        );
+      }
+    }
+
+    // Insert meal types
+    if (mealTypes && mealTypes.length > 0) {
+      for (const mealTypeId of mealTypes) {
+        await client.query(
+          `INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [recipe.id, mealTypeId]
+        );
+      }
+    }
+
+    // Insert dietary labels
+    if (dietaryLabels && dietaryLabels.length > 0) {
+      for (const dietaryLabelId of dietaryLabels) {
+        await client.query(
+          `INSERT INTO recipe_dietary_labels (recipe_id, dietary_label_id) VALUES ($1, $2)
+           ON CONFLICT DO NOTHING`,
+          [recipe.id, dietaryLabelId]
+        );
+      }
+    }
+
     await client.query('COMMIT');
 
     // Fetch complete recipe with relationships
@@ -212,6 +248,9 @@ async function getRecipes(req, res) {
     sortBy = 'createdAt',
     sortOrder = 'desc',
     maxCookTime = '',
+    cuisines = '',
+    mealTypes = '',
+    dietaryLabels = '',
   } = req.query;
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -274,6 +313,39 @@ async function getRecipes(req, res) {
         )`;
         params.push(maxMinutes);
       }
+    }
+
+    // Add cuisines filter
+    if (cuisines) {
+      const cuisineArray = cuisines.split(',').map((c) => c.trim());
+      paramCount++;
+      query += ` AND EXISTS (
+        SELECT 1 FROM recipe_cuisines rc
+        WHERE rc.recipe_id = r.id AND rc.cuisine_id = ANY($${paramCount})
+      )`;
+      params.push(cuisineArray);
+    }
+
+    // Add meal types filter
+    if (mealTypes) {
+      const mealTypeArray = mealTypes.split(',').map((m) => m.trim());
+      paramCount++;
+      query += ` AND EXISTS (
+        SELECT 1 FROM recipe_meal_types rm
+        WHERE rm.recipe_id = r.id AND rm.meal_type_id = ANY($${paramCount})
+      )`;
+      params.push(mealTypeArray);
+    }
+
+    // Add dietary labels filter
+    if (dietaryLabels) {
+      const dietaryLabelArray = dietaryLabels.split(',').map((d) => d.trim());
+      paramCount++;
+      query += ` AND EXISTS (
+        SELECT 1 FROM recipe_dietary_labels rd
+        WHERE rd.recipe_id = r.id AND rd.dietary_label_id = ANY($${paramCount})
+      )`;
+      params.push(dietaryLabelArray);
     }
 
     // Get total count
@@ -400,6 +472,30 @@ async function getRecipeById(recipeId, userId) {
     [recipeId]
   );
 
+  // Get cuisines
+  const cuisinesResult = await pool.query(
+    `SELECT c.id, c.name FROM cuisines c
+     JOIN recipe_cuisines rc ON c.id = rc.cuisine_id
+     WHERE rc.recipe_id = $1`,
+    [recipeId]
+  );
+
+  // Get meal types
+  const mealTypesResult = await pool.query(
+    `SELECT m.id, m.name FROM meal_types m
+     JOIN recipe_meal_types rm ON m.id = rm.meal_type_id
+     WHERE rm.recipe_id = $1`,
+    [recipeId]
+  );
+
+  // Get dietary labels
+  const dietaryLabelsResult = await pool.query(
+    `SELECT d.id, d.name FROM dietary_labels d
+     JOIN recipe_dietary_labels rd ON d.id = rd.dietary_label_id
+     WHERE rd.recipe_id = $1`,
+    [recipeId]
+  );
+
   return {
     id: recipe.id,
     userId: recipe.user_id,
@@ -430,6 +526,9 @@ async function getRecipeById(recipeId, userId) {
       instructionText: i.instruction_text,
     })),
     tags: tagsResult.rows,
+    cuisines: cuisinesResult.rows,
+    mealTypes: mealTypesResult.rows,
+    dietaryLabels: dietaryLabelsResult.rows,
   };
 }
 
@@ -451,6 +550,9 @@ async function updateRecipe(req, res) {
     ingredients,
     instructions,
     tags,
+    cuisines,
+    mealTypes,
+    dietaryLabels,
   } = req.body;
 
   const client = await pool.connect();
@@ -579,6 +681,39 @@ async function updateRecipe(req, res) {
       }
     }
 
+    // Update cuisines if provided
+    if (cuisines) {
+      await client.query('DELETE FROM recipe_cuisines WHERE recipe_id = $1', [recipeId]);
+      for (const cuisineId of cuisines) {
+        await client.query(
+          `INSERT INTO recipe_cuisines (recipe_id, cuisine_id) VALUES ($1, $2)`,
+          [recipeId, cuisineId]
+        );
+      }
+    }
+
+    // Update meal types if provided
+    if (mealTypes) {
+      await client.query('DELETE FROM recipe_meal_types WHERE recipe_id = $1', [recipeId]);
+      for (const mealTypeId of mealTypes) {
+        await client.query(
+          `INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)`,
+          [recipeId, mealTypeId]
+        );
+      }
+    }
+
+    // Update dietary labels if provided
+    if (dietaryLabels) {
+      await client.query('DELETE FROM recipe_dietary_labels WHERE recipe_id = $1', [recipeId]);
+      for (const dietaryLabelId of dietaryLabels) {
+        await client.query(
+          `INSERT INTO recipe_dietary_labels (recipe_id, dietary_label_id) VALUES ($1, $2)`,
+          [recipeId, dietaryLabelId]
+        );
+      }
+    }
+
     await client.query('COMMIT');
 
     // Fetch updated recipe
@@ -683,6 +818,51 @@ async function getUserTags(req, res) {
   }
 }
 
+/**
+ * Get all cuisines
+ */
+async function getCuisines(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name FROM cuisines ORDER BY sort_order, name`
+    );
+    res.status(200).json({ cuisines: result.rows });
+  } catch (error) {
+    logger.error('Get cuisines error', { error: error.message });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch cuisines');
+  }
+}
+
+/**
+ * Get all meal types
+ */
+async function getMealTypes(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name FROM meal_types ORDER BY sort_order, name`
+    );
+    res.status(200).json({ mealTypes: result.rows });
+  } catch (error) {
+    logger.error('Get meal types error', { error: error.message });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch meal types');
+  }
+}
+
+/**
+ * Get all dietary labels
+ */
+async function getDietaryLabels(req, res) {
+  try {
+    const result = await pool.query(
+      `SELECT id, name FROM dietary_labels ORDER BY sort_order, name`
+    );
+    res.status(200).json({ dietaryLabels: result.rows });
+  } catch (error) {
+    logger.error('Get dietary labels error', { error: error.message });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch dietary labels');
+  }
+}
+
 module.exports = {
   extractRecipeFromUrl,
   saveRecipe,
@@ -693,4 +873,7 @@ module.exports = {
   deleteRecipe,
   getIngredientsForRecipes,
   getUserTags,
+  getCuisines,
+  getMealTypes,
+  getDietaryLabels,
 };

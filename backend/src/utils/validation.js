@@ -53,6 +53,9 @@ const saveRecipeSchema = Joi.object({
   ingredients: Joi.array().items(ingredientSchema).min(1).required(),
   instructions: Joi.array().items(instructionSchema).min(1).required(),
   tags: Joi.array().items(Joi.string().max(50)).optional(),
+  cuisines: Joi.array().items(Joi.string().uuid()).optional(),
+  mealTypes: Joi.array().items(Joi.string().uuid()).optional(),
+  dietaryLabels: Joi.array().items(Joi.string().uuid()).optional(),
   extractionMethod: Joi.string().valid('schema', 'llm', 'manual').optional(),
   author: Joi.string().max(200).optional().allow(null, ''), // Allow author from extraction
   extractionQuality: Joi.object().optional(), // Allow extraction quality metadata
@@ -71,6 +74,9 @@ const updateRecipeSchema = Joi.object({
   ingredients: Joi.array().items(ingredientSchema).min(1).optional(),
   instructions: Joi.array().items(instructionSchema).min(1).optional(),
   tags: Joi.array().items(Joi.string().max(50)).optional(),
+  cuisines: Joi.array().items(Joi.string().uuid()).optional(),
+  mealTypes: Joi.array().items(Joi.string().uuid()).optional(),
+  dietaryLabels: Joi.array().items(Joi.string().uuid()).optional(),
 });
 
 // Meal plan schema

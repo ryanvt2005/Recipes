@@ -26,8 +26,35 @@ export default function AddRecipePage() {
   const [extractionMeta, setExtractionMeta] = useState(null); // Stores quality score, method, cached
   const [duplicateRecipe, setDuplicateRecipe] = useState(null); // Stores existing recipe if duplicate URL
 
+  // Category state
+  const [availableCuisines, setAvailableCuisines] = useState([]);
+  const [availableMealTypes, setAvailableMealTypes] = useState([]);
+  const [availableDietaryLabels, setAvailableDietaryLabels] = useState([]);
+  const [selectedCuisines, setSelectedCuisines] = useState([]);
+  const [selectedMealTypes, setSelectedMealTypes] = useState([]);
+  const [selectedDietaryLabels, setSelectedDietaryLabels] = useState([]);
+
   const navigate = useNavigate();
   const statusIntervalRef = useRef(null);
+
+  // Fetch categories on mount
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const [cuisinesRes, mealTypesRes, dietaryRes] = await Promise.all([
+          recipes.getCuisines(),
+          recipes.getMealTypes(),
+          recipes.getDietaryLabels(),
+        ]);
+        setAvailableCuisines(cuisinesRes.data.cuisines || []);
+        setAvailableMealTypes(mealTypesRes.data.mealTypes || []);
+        setAvailableDietaryLabels(dietaryRes.data.dietaryLabels || []);
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const handleStartManual = () => {
     setExtractedRecipe({
@@ -134,6 +161,11 @@ export default function AddRecipePage() {
       delete recipeData.cached;
       delete recipeData.extractionMethod;
       delete recipeData.extractionQuality;
+
+      // Add categories
+      recipeData.cuisines = selectedCuisines;
+      recipeData.mealTypes = selectedMealTypes;
+      recipeData.dietaryLabels = selectedDietaryLabels;
 
       const response = await recipes.create(recipeData);
       navigate(`/recipes/${response.data.recipe.id}`);
@@ -535,6 +567,98 @@ export default function AddRecipePage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Categories */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Categories (Optional)</h3>
+
+              {/* Cuisine */}
+              {availableCuisines.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cuisine</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableCuisines.map((cuisine) => (
+                      <button
+                        key={cuisine.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedCuisines((prev) =>
+                            prev.includes(cuisine.id)
+                              ? prev.filter((c) => c !== cuisine.id)
+                              : [...prev, cuisine.id]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedCuisines.includes(cuisine.id)
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {cuisine.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Meal Type */}
+              {availableMealTypes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Meal Type</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableMealTypes.map((mealType) => (
+                      <button
+                        key={mealType.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedMealTypes((prev) =>
+                            prev.includes(mealType.id)
+                              ? prev.filter((m) => m !== mealType.id)
+                              : [...prev, mealType.id]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedMealTypes.includes(mealType.id)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {mealType.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Dietary */}
+              {availableDietaryLabels.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dietary</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableDietaryLabels.map((dietary) => (
+                      <button
+                        key={dietary.id}
+                        type="button"
+                        onClick={() =>
+                          setSelectedDietaryLabels((prev) =>
+                            prev.includes(dietary.id)
+                              ? prev.filter((d) => d !== dietary.id)
+                              : [...prev, dietary.id]
+                          )
+                        }
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedDietaryLabels.includes(dietary.id)
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {dietary.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Save Button */}

@@ -477,6 +477,36 @@ export default function RecipeDetailPage() {
           </div>
         )}
 
+        {/* Categories */}
+        {(recipe.cuisines?.length > 0 || recipe.mealTypes?.length > 0 || recipe.dietaryLabels?.length > 0) && (
+          <div className="mb-8 flex flex-wrap gap-2">
+            {recipe.cuisines?.map((cuisine) => (
+              <span
+                key={cuisine.id}
+                className="inline-block bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm"
+              >
+                {cuisine.name}
+              </span>
+            ))}
+            {recipe.mealTypes?.map((mealType) => (
+              <span
+                key={mealType.id}
+                className="inline-block bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm"
+              >
+                {mealType.name}
+              </span>
+            ))}
+            {recipe.dietaryLabels?.map((dietary) => (
+              <span
+                key={dietary.id}
+                className="inline-block bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm"
+              >
+                {dietary.name}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Content Grid */}
         <div className="grid md:grid-cols-5 gap-8">
           {/* Ingredients */}

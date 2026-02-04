@@ -27,25 +27,41 @@ export default function RecipesPage() {
   const [maxCookTime, setMaxCookTime] = useState('');
   const [showFilters, setShowFilters] = useState(false);
 
+  // Category filter state
+  const [availableCuisines, setAvailableCuisines] = useState([]);
+  const [selectedCuisines, setSelectedCuisines] = useState([]);
+  const [availableMealTypes, setAvailableMealTypes] = useState([]);
+  const [selectedMealTypes, setSelectedMealTypes] = useState([]);
+  const [availableDietaryLabels, setAvailableDietaryLabels] = useState([]);
+  const [selectedDietaryLabels, setSelectedDietaryLabels] = useState([]);
+
   const navigate = useNavigate();
 
-  // Fetch tags on mount
+  // Fetch tags and categories on mount
   useEffect(() => {
-    const fetchTags = async () => {
+    const fetchFilters = async () => {
       try {
-        const response = await recipes.getTags();
-        setAvailableTags(response.data.tags || []);
+        const [tagsRes, cuisinesRes, mealTypesRes, dietaryRes] = await Promise.all([
+          recipes.getTags(),
+          recipes.getCuisines(),
+          recipes.getMealTypes(),
+          recipes.getDietaryLabels(),
+        ]);
+        setAvailableTags(tagsRes.data.tags || []);
+        setAvailableCuisines(cuisinesRes.data.cuisines || []);
+        setAvailableMealTypes(mealTypesRes.data.mealTypes || []);
+        setAvailableDietaryLabels(dietaryRes.data.dietaryLabels || []);
       } catch (err) {
-        console.error('Failed to load tags:', err);
+        console.error('Failed to load filters:', err);
       }
     };
-    fetchTags();
+    fetchFilters();
   }, []);
 
   // Fetch recipes when filters change
   useEffect(() => {
     fetchRecipes();
-  }, [page, search, selectedTags, sortBy, sortOrder, maxCookTime]);
+  }, [page, search, selectedTags, sortBy, sortOrder, maxCookTime, selectedCuisines, selectedMealTypes, selectedDietaryLabels]);
 
   const fetchRecipes = async () => {
     try {
@@ -58,6 +74,9 @@ export default function RecipesPage() {
         sortBy,
         sortOrder,
         maxCookTime,
+        cuisines: selectedCuisines.join(','),
+        mealTypes: selectedMealTypes.join(','),
+        dietaryLabels: selectedDietaryLabels.join(','),
       });
       setRecipeList(response.data.recipes);
       setPagination(response.data.pagination);
@@ -80,8 +99,32 @@ export default function RecipesPage() {
     setPage(1);
   };
 
+  const toggleCuisine = (cuisineId) => {
+    setSelectedCuisines((prev) =>
+      prev.includes(cuisineId) ? prev.filter((c) => c !== cuisineId) : [...prev, cuisineId]
+    );
+    setPage(1);
+  };
+
+  const toggleMealType = (mealTypeId) => {
+    setSelectedMealTypes((prev) =>
+      prev.includes(mealTypeId) ? prev.filter((m) => m !== mealTypeId) : [...prev, mealTypeId]
+    );
+    setPage(1);
+  };
+
+  const toggleDietaryLabel = (dietaryLabelId) => {
+    setSelectedDietaryLabels((prev) =>
+      prev.includes(dietaryLabelId) ? prev.filter((d) => d !== dietaryLabelId) : [...prev, dietaryLabelId]
+    );
+    setPage(1);
+  };
+
   const clearFilters = () => {
     setSelectedTags([]);
+    setSelectedCuisines([]);
+    setSelectedMealTypes([]);
+    setSelectedDietaryLabels([]);
     setSortBy('createdAt');
     setSortOrder('desc');
     setMaxCookTime('');
@@ -90,7 +133,13 @@ export default function RecipesPage() {
   };
 
   const hasActiveFilters =
-    selectedTags.length > 0 || maxCookTime || sortBy !== 'createdAt' || sortOrder !== 'desc';
+    selectedTags.length > 0 ||
+    selectedCuisines.length > 0 ||
+    selectedMealTypes.length > 0 ||
+    selectedDietaryLabels.length > 0 ||
+    maxCookTime ||
+    sortBy !== 'createdAt' ||
+    sortOrder !== 'desc';
 
   const cookTimeOptions = [
     { value: '', label: 'Any time' },
@@ -197,7 +246,7 @@ export default function RecipesPage() {
               Filters
               {hasActiveFilters && (
                 <span className="ml-1 bg-primary-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {selectedTags.length + (maxCookTime ? 1 : 0) + (sortBy !== 'createdAt' ? 1 : 0)}
+                  {selectedTags.length + selectedCuisines.length + selectedMealTypes.length + selectedDietaryLabels.length + (maxCookTime ? 1 : 0) + (sortBy !== 'createdAt' ? 1 : 0)}
                 </span>
               )}
             </Button>
@@ -283,6 +332,72 @@ export default function RecipesPage() {
                 </div>
               )}
 
+              {/* Cuisine */}
+              {availableCuisines.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Cuisine</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableCuisines.map((cuisine) => (
+                      <button
+                        key={cuisine.id}
+                        onClick={() => toggleCuisine(cuisine.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedCuisines.includes(cuisine.id)
+                            ? 'bg-orange-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {cuisine.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Meal Type */}
+              {availableMealTypes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Meal Type</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableMealTypes.map((mealType) => (
+                      <button
+                        key={mealType.id}
+                        onClick={() => toggleMealType(mealType.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedMealTypes.includes(mealType.id)
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {mealType.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Dietary */}
+              {availableDietaryLabels.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Dietary</label>
+                  <div className="flex flex-wrap gap-2">
+                    {availableDietaryLabels.map((dietary) => (
+                      <button
+                        key={dietary.id}
+                        onClick={() => toggleDietaryLabel(dietary.id)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedDietaryLabels.includes(dietary.id)
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        {dietary.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Clear Filters */}
               {hasActiveFilters && (
                 <div className="pt-2 border-t">
@@ -312,10 +427,52 @@ export default function RecipesPage() {
                   </button>
                 </span>
               ))}
+              {selectedCuisines.map((cuisineId) => {
+                const cuisine = availableCuisines.find((c) => c.id === cuisineId);
+                return cuisine ? (
+                  <span
+                    key={cuisineId}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800"
+                  >
+                    {cuisine.name}
+                    <button onClick={() => toggleCuisine(cuisineId)} className="ml-1 hover:text-orange-600">
+                      ×
+                    </button>
+                  </span>
+                ) : null;
+              })}
+              {selectedMealTypes.map((mealTypeId) => {
+                const mealType = availableMealTypes.find((m) => m.id === mealTypeId);
+                return mealType ? (
+                  <span
+                    key={mealTypeId}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
+                  >
+                    {mealType.name}
+                    <button onClick={() => toggleMealType(mealTypeId)} className="ml-1 hover:text-blue-600">
+                      ×
+                    </button>
+                  </span>
+                ) : null;
+              })}
+              {selectedDietaryLabels.map((dietaryId) => {
+                const dietary = availableDietaryLabels.find((d) => d.id === dietaryId);
+                return dietary ? (
+                  <span
+                    key={dietaryId}
+                    className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800"
+                  >
+                    {dietary.name}
+                    <button onClick={() => toggleDietaryLabel(dietaryId)} className="ml-1 hover:text-green-600">
+                      ×
+                    </button>
+                  </span>
+                ) : null;
+              })}
               {maxCookTime && (
-                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-200 text-gray-700">
                   Under {maxCookTime} min
-                  <button onClick={() => setMaxCookTime('')} className="ml-1 hover:text-blue-600">
+                  <button onClick={() => setMaxCookTime('')} className="ml-1 hover:text-gray-600">
                     ×
                   </button>
                 </span>
