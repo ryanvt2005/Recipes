@@ -81,7 +81,7 @@ export default function RecipeNotes({ recipeId }) {
 
   if (loading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
+      <div className="card">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">My Notes</h2>
         <p className="text-gray-500">Loading...</p>
       </div>
@@ -89,21 +89,21 @@ export default function RecipeNotes({ recipeId }) {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="card">
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold text-gray-900">My Notes</h2>
         {note && !isEditing && (
           <div className="flex gap-2">
             <button
               onClick={handleEdit}
-              className="text-gray-600 hover:text-primary-600 transition-colors"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
               title="Edit note"
             >
               <PencilIcon className="h-5 w-5" />
             </button>
             <button
               onClick={handleDelete}
-              className="text-gray-600 hover:text-red-600 transition-colors"
+              className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
               title="Delete note"
               disabled={saving}
             >

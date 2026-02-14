@@ -1,78 +1,143 @@
-# Plan: Improve Ingredient Parsing for Cleaner Shopping Lists
+# Pepperplate Import Feature - Implementation Plan
 
-## Problem Statement
-Ingredient parsing from recipes can produce errors or unclear items in shopping lists. This plan addresses the key parsing issues.
+## Overview
+Add the ability to import recipes from a Pepperplate.com export file (.zip containing .txt files).
 
-## Current State
-The codebase has a solid foundation:
-- `ingredientParser.js` - parses quantities, units, names
-- `ingredientAggregator.js` - normalizes and combines ingredients
-- 470+ ingredient family mappings
-- 100+ modifier stripping patterns
+## Pepperplate Export Format Analysis
 
-## Identified Issues
+Each `.txt` file follows this structure:
+```
+Title: <recipe title>
+Description: <optional>
+Source: <optional - source name>
+Original URL: <optional - source URL>
+Yield: <optional - servings>
+Active: <optional - prep time>
+Total: <optional - total time>
+Image: <optional - image URL, field may be absent entirely>
+Ingredients:
+	<tab-indented ingredient lines>
 
-### High Priority
-1. **"To taste" ingredients** - Items like "salt to taste" lose context
-2. **Mixed number spacing** - "1 ½" vs "1½" handled inconsistently
-3. **Quantity-less items** - "butter" without quantity/unit shows poorly
-4. **Database string coercion** - Quantities from Postgres sometimes come as strings
+Instructions:
+	<tab-indented instruction lines>
+```
 
-### Medium Priority
-5. **Aggressive modifier stripping** - May remove important descriptors
-6. **Incompatible unit display** - "2 cups + 4 oz" shows as note, loses quantities
-7. **Missing unit inference** - "2 eggs" needs "piece" unit inferred
+Key observations:
+- Empty fields have the label but no value (e.g., "Description: ")
+- `Image:` field is optional and may not be present at all
+- `Active` maps to `prepTime`, `Total` maps to `totalTime`
+- No explicit `cookTime` field
+- Some recipes have empty `Instructions:` section
+- Ingredients may lack quantities (e.g., "Blue Cheese Crumbles")
 
-### Lower Priority
-8. **Compound measurements** - "1 lb 4 oz" not fully supported
-9. **Vague quantities** - "a few", "some", "several" not handled
-10. **Typo tolerance** - No fuzzy matching for misspellings
+## Implementation Steps
 
-## Implementation Plan
+### 1. Backend: Pepperplate Parser Utility
+**File:** `backend/src/utils/pepperplateParser.js`
 
-### Phase 1: Quick Wins (Low Risk)
-Files: `backend/src/utils/ingredientParser.js`
+Create a parser that:
+- Accepts raw text content of a single `.txt` file
+- Parses the header fields (Title, Description, Source, etc.)
+- Parses the Ingredients section (tab-indented lines after "Ingredients:")
+- Parses the Instructions section (tab-indented lines after "Instructions:")
+- Returns a recipe object matching the `saveRecipe` schema
 
-- [ ] Add "to taste" detection → preserve in rawText, set quantity=null
-- [ ] Normalize Unicode fraction spacing before parsing
-- [ ] Add unit inference for common countables (eggs, cloves, stalks)
-- [ ] Centralize string→number coercion in one utility function
+Field mapping:
+| Pepperplate | App Field |
+|-------------|-----------|
+| Title | title |
+| Description | description |
+| Original URL | sourceUrl |
+| Source | (stored in description or discarded) |
+| Yield | servings |
+| Active | prepTime |
+| Total | totalTime |
+| Image | imageUrl |
+| Ingredients | ingredients (parsed via ingredientParser) |
+| Instructions | instructions |
 
-### Phase 2: Display Improvements
-Files: `frontend/src/core/ingredients.js`, `ShoppingItemsList.jsx`
+### 2. Backend: Import Controller
+**File:** `backend/src/controllers/importController.js`
 
-- [ ] Improve display of quantity-less items (show "as needed" or similar)
-- [ ] Better formatting for incompatible unit combinations
-- [ ] Show preparation notes more prominently
+Functions:
+- `importFromPepperplate(req, res)` - Handles multipart/form-data file upload
+  - Accept `.zip` file
+  - Extract and parse each `.txt` file
+  - Use existing `ingredientParser.parseIngredientString()` for ingredient parsing
+  - Return summary: { total, imported, skipped, errors }
 
-### Phase 3: Smarter Aggregation
-Files: `backend/src/utils/ingredientAggregator.js`
+Import behavior:
+- Skip recipes that already exist (by title match for same user)
+- Set `extractionMethod` to `'pepperplate-import'`
+- Process in batches to avoid memory issues (1,085 recipes)
 
-- [ ] Tiered modifier stripping (prep methods vs quality descriptors)
-- [ ] Extend INGREDIENT_FAMILY_MAP with more variants
-- [ ] Better handling of unspecified variants (bell pepper without color)
+### 3. Backend: Import Routes
+**File:** `backend/src/routes/importRoutes.js`
 
-### Phase 4: Advanced (Future)
-- [ ] Fuzzy matching for typos
-- [ ] ML-assisted unit inference
-- [ ] User correction learning
+Routes:
+- `POST /api/import/pepperplate` - Upload and import Pepperplate zip
 
-## Files to Modify
+### 4. Backend: Validation Schema
+**File:** `backend/src/utils/validation.js`
 
-| File | Changes |
-|------|---------|
-| `backend/src/utils/ingredientParser.js` | Add "to taste" handling, Unicode normalization |
-| `backend/src/utils/ingredientAggregator.js` | Tiered modifiers, family map expansion |
-| `backend/src/controllers/shoppingListController.js` | Centralize quantity coercion |
-| `frontend/src/core/ingredients.js` | Display formatting improvements |
-| `frontend/src/components/shopping/ShoppingItemsList.jsx` | Better quantity-less display |
+Add validation for import endpoint (file type, size limits).
 
-## Testing Approach
-- Add unit tests for each edge case
-- Test with real recipe imports
-- Verify shopping list display improvements
+### 5. Frontend: Import Page/Modal
+**File:** `frontend/src/pages/ImportPage.jsx` (or modal component)
 
-## Estimated Scope
-- Phase 1: ~20 lines of code changes
-- Phase 2: ~15 lines of code changes
-- Phase 3: ~30 lines of code changes
+UI elements:
+- File upload dropzone for .zip file
+- Import button
+- Progress indicator (processing X of Y recipes)
+- Results summary (imported, skipped duplicates, errors)
+- Link to view imported recipes
+
+### 6. Frontend: Navigation
+**File:** `frontend/src/components/Navbar.jsx` (or similar)
+
+Add "Import" link/button to navigation.
+
+### 7. Frontend: API Method
+**File:** `frontend/src/api/recipes.js`
+
+Add `importFromPepperplate(file)` method using FormData.
+
+## Technical Considerations
+
+### Memory Management
+- Stream/chunk processing for large zip files
+- Use `adm-zip` for zip extraction (simpler API than yauzl)
+- Process recipes in batches of 50-100
+
+### Duplicate Detection
+- Check by normalized title (lowercase, trim) + user_id
+- Option: check by sourceUrl if present
+- Return list of skipped duplicates in response
+
+### Error Handling
+- Continue importing even if individual recipes fail
+- Collect errors with recipe filename for user feedback
+- Validate required fields (title at minimum)
+
+## File Changes Summary
+
+| File | Action |
+|------|--------|
+| `backend/src/utils/pepperplateParser.js` | Create |
+| `backend/src/controllers/importController.js` | Create |
+| `backend/src/routes/importRoutes.js` | Create |
+| `backend/src/routes/index.js` | Modify (add import routes) |
+| `backend/src/utils/validation.js` | Modify (add import schema) |
+| `frontend/src/pages/ImportPage.jsx` | Create |
+| `frontend/src/api/recipes.js` | Modify (add import method) |
+| `frontend/src/App.jsx` | Modify (add route) |
+| Navigation component | Modify (add link) |
+
+## Dependencies
+- `adm-zip` - Zip file extraction (backend) - needs to be installed
+- `multer` - File upload handling (check if already installed)
+
+## Testing
+- Unit tests for pepperplateParser with sample files
+- Integration test for full import flow
+- Test with the provided 1,085 recipe export

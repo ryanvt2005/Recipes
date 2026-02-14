@@ -18,6 +18,7 @@ const {
   upsertNoteForRecipe,
   deleteNoteForRecipe,
 } = require('../controllers/recipeNotesController');
+const { batchAutoTag } = require('../controllers/batchTaggingController');
 const { authenticateToken } = require('../middlewares/auth');
 const {
   validate,
@@ -68,6 +69,9 @@ router.get('/meal-types', authenticateToken, getMealTypes);
 
 // GET /api/v1/recipes/dietary-labels - Get all dietary labels
 router.get('/dietary-labels', authenticateToken, getDietaryLabels);
+
+// POST /api/v1/recipes/batch-autotag - Batch auto-tag uncategorized recipes
+router.post('/batch-autotag', authenticateToken, batchAutoTag);
 
 // GET /api/v1/recipes/:id - Get a single recipe
 router.get('/:id', authenticateToken, getRecipe);

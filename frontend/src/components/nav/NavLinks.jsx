@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 const navItems = [
   { to: '/recipes', label: 'My Recipes' },
   { to: '/recipes/new', label: 'Add Recipe' },
+  { to: '/import', label: 'Import' },
   { to: '/shopping-lists', label: 'Shopping Lists' },
 ];
 
@@ -18,8 +19,8 @@ export default function NavLinks({ onClick, className = '', vertical = false }) 
     return `${baseClasses} ${
       isActive
         ? 'text-primary-600 bg-primary-50'
-        : 'text-gray-700 hover:text-primary-600 hover:bg-gray-50'
-    } ${className}`;
+        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+    } transition-colors duration-150 ${className}`;
   };
 
   return (

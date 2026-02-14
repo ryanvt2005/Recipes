@@ -7,11 +7,11 @@ export default function MobileDrawer({ isOpen, onClose, user, onLogout }) {
   return (
     <Dialog open={isOpen} onClose={onClose} className="relative z-50">
       {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/20" aria-hidden="true" />
 
       {/* Drawer panel */}
       <div className="fixed inset-0 flex justify-end">
-        <DialogPanel className="w-full max-w-xs bg-white shadow-xl flex flex-col">
+        <DialogPanel className="w-full max-w-xs bg-white shadow-elevated border-l border-gray-200 flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-4 border-b border-gray-200">
             <DialogTitle className="text-lg font-semibold text-gray-900">Menu</DialogTitle>

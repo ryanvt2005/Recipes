@@ -108,6 +108,33 @@ export const recipesApi = {
    * @returns {Promise} - Response with dietaryLabels array
    */
   getDietaryLabels: () => http.get('/recipes/dietary-labels'),
+
+  /**
+   * Batch auto-tag recipes with cuisines, meal types, and dietary labels
+   * @param {Object} [options] - Options for batch tagging
+   * @param {boolean} [options.force=false] - If true, retag all recipes; if false, only uncategorized
+   * @returns {Promise} - Response with tagging results
+   */
+  batchAutoTag: (options = {}) =>
+    http.post('/recipes/batch-autotag', options, {
+      timeout: 300000,
+    }),
+
+  /**
+   * Import recipes from a Pepperplate export zip file
+   * @param {File} file - The zip file to import
+   * @returns {Promise} - Response with import results
+   */
+  importFromPepperplate: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return http.post('/import/pepperplate', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 300000, // 5 minute timeout for large imports
+    });
+  },
 };
 
 export default recipesApi;

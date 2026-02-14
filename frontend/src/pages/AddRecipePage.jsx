@@ -104,6 +104,17 @@ export default function AddRecipePage() {
         sourceUrl: recipe.sourceUrl || url,
       });
 
+      // Pre-populate suggested categories from auto-tagger
+      if (recipe.suggestedCuisines?.length > 0) {
+        setSelectedCuisines(recipe.suggestedCuisines);
+      }
+      if (recipe.suggestedMealTypes?.length > 0) {
+        setSelectedMealTypes(recipe.suggestedMealTypes);
+      }
+      if (recipe.suggestedDietaryLabels?.length > 0) {
+        setSelectedDietaryLabels(recipe.suggestedDietaryLabels);
+      }
+
       setExtractedRecipe(recipe);
     } catch (err) {
       if (err.response?.status === 409 && err.response?.data?.details?.existingRecipe) {
@@ -224,7 +235,7 @@ export default function AddRecipePage() {
   return (
     <Layout>
       <div className="max-w-4xl mx-auto space-y-6">
-        <h1 className="text-3xl font-bold text-gray-900">Add Recipe</h1>
+        <h1 className="text-2xl font-semibold text-gray-900">Add Recipe</h1>
 
         {/* Mode Selection */}
         {!extractedRecipe && (
@@ -233,7 +244,7 @@ export default function AddRecipePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <button
                 onClick={() => setMode('extract')}
-                className={`p-6 border-2 rounded-lg text-left hover:border-primary-500 transition ${
+                className={`p-4 sm:p-6 border rounded-xl text-left hover:border-primary-500 transition ${
                   mode === 'extract' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
                 }`}
               >
@@ -244,7 +255,7 @@ export default function AddRecipePage() {
               </button>
               <button
                 onClick={handleStartManual}
-                className={`p-6 border-2 rounded-lg text-left hover:border-primary-500 transition ${
+                className={`p-4 sm:p-6 border rounded-xl text-left hover:border-primary-500 transition ${
                   mode === 'manual' ? 'border-primary-500 bg-primary-50' : 'border-gray-200'
                 }`}
               >
@@ -592,7 +603,7 @@ export default function AddRecipePage() {
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                           selectedCuisines.includes(cuisine.id)
                             ? 'bg-orange-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                         }`}
                       >
                         {cuisine.name}
@@ -621,7 +632,7 @@ export default function AddRecipePage() {
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                           selectedMealTypes.includes(mealType.id)
                             ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                         }`}
                       >
                         {mealType.name}
@@ -650,7 +661,7 @@ export default function AddRecipePage() {
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                           selectedDietaryLabels.includes(dietary.id)
                             ? 'bg-green-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                         }`}
                       >
                         {dietary.name}

@@ -9,6 +9,7 @@ import RecipeDetailPage from './pages/RecipeDetailPage';
 import AddRecipePage from './pages/AddRecipePage';
 import ShoppingListsPage from './pages/ShoppingListsPage';
 import ShoppingListPage from './pages/ShoppingListPage';
+import ImportPage from './pages/ImportPage';
 
 function App() {
   return (
@@ -60,6 +61,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <ShoppingListPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/import"
+            element={
+              <ProtectedRoute>
+                <ImportPage />
               </ProtectedRoute>
             }
           />

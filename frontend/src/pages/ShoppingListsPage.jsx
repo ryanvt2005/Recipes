@@ -48,7 +48,7 @@ export default function ShoppingListsPage() {
       <div className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">Shopping Lists</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">Shopping Lists</h1>
           <Link to="/recipes">
             <Button variant="secondary">Back to Recipes</Button>
           </Link>
@@ -78,7 +78,7 @@ export default function ShoppingListsPage() {
               <Link
                 key={list.id}
                 to={`/shopping-lists/${list.id}`}
-                className="card hover:shadow-lg transition-shadow"
+                className="card hover:shadow-elevated hover:border-gray-300 transition-all duration-200"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">

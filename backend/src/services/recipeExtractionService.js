@@ -7,6 +7,7 @@ const pool = require('../config/database');
 const logger = require('../config/logger');
 const { parseIngredientString: parseIngredient } = require('../utils/ingredientParser');
 const { extractFromWPRM } = require('./extractors/wpRecipeMakerExtractor');
+const { autoTagRecipe } = require('../utils/recipeAutoTagger');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -870,6 +871,19 @@ async function extractRecipe(url) {
   // Add source URL and extraction method
   recipe.sourceUrl = normalizeUrl(url);
   recipe.extractionMethod = extractionMethod;
+
+  // Auto-tag with suggested categories
+  try {
+    const tags = await autoTagRecipe(recipe, pool);
+    recipe.suggestedCuisines = tags.cuisineIds;
+    recipe.suggestedMealTypes = tags.mealTypeIds;
+    recipe.suggestedDietaryLabels = tags.dietaryLabelIds;
+  } catch (tagError) {
+    logger.warn('Auto-tagging failed during extraction', { error: tagError.message });
+    recipe.suggestedCuisines = [];
+    recipe.suggestedMealTypes = [];
+    recipe.suggestedDietaryLabels = [];
+  }
 
   // Save to cache
   await saveToCache(url, recipe, extractionMethod);

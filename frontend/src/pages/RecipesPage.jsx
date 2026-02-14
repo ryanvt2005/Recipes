@@ -207,7 +207,7 @@ export default function RecipesPage() {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-900">My Recipes</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">My Recipes</h1>
           <Link to="/recipes/new">
             <Button>+ Add Recipe</Button>
           </Link>
@@ -231,7 +231,7 @@ export default function RecipesPage() {
               className={showFilters ? 'bg-primary-100' : ''}
             >
               <svg
-                className="w-5 h-5 mr-1"
+                className="w-5 h-5 sm:mr-1"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -243,7 +243,7 @@ export default function RecipesPage() {
                   d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"
                 />
               </svg>
-              Filters
+              <span className="hidden sm:inline">Filters</span>
               {hasActiveFilters && (
                 <span className="ml-1 bg-primary-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                   {selectedTags.length + selectedCuisines.length + selectedMealTypes.length + selectedDietaryLabels.length + (maxCookTime ? 1 : 0) + (sortBy !== 'createdAt' ? 1 : 0)}
@@ -254,7 +254,7 @@ export default function RecipesPage() {
 
           {/* Filter Panel */}
           {showFilters && (
-            <div className="bg-gray-50 rounded-lg p-4 space-y-4">
+            <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
               {/* Sort and Cook Time Controls */}
               <div className="flex flex-wrap gap-4">
                 <div className="flex-1 min-w-[150px]">
@@ -318,10 +318,10 @@ export default function RecipesPage() {
                       <button
                         key={tag.id}
                         onClick={() => toggleTag(tag.name)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 min-h-[36px] rounded-full text-sm font-medium transition-colors ${
                           selectedTags.includes(tag.name)
                             ? 'bg-primary-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                         }`}
                       >
                         {tag.name}
@@ -341,10 +341,10 @@ export default function RecipesPage() {
                       <button
                         key={cuisine.id}
                         onClick={() => toggleCuisine(cuisine.id)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 min-h-[36px] rounded-full text-sm font-medium transition-colors ${
                           selectedCuisines.includes(cuisine.id)
                             ? 'bg-orange-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                         }`}
                       >
                         {cuisine.name}
@@ -363,10 +363,10 @@ export default function RecipesPage() {
                       <button
                         key={mealType.id}
                         onClick={() => toggleMealType(mealType.id)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 min-h-[36px] rounded-full text-sm font-medium transition-colors ${
                           selectedMealTypes.includes(mealType.id)
                             ? 'bg-blue-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                         }`}
                       >
                         {mealType.name}
@@ -385,10 +385,10 @@ export default function RecipesPage() {
                       <button
                         key={dietary.id}
                         onClick={() => toggleDietaryLabel(dietary.id)}
-                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                        className={`px-3 py-1.5 min-h-[36px] rounded-full text-sm font-medium transition-colors ${
                           selectedDietaryLabels.includes(dietary.id)
                             ? 'bg-green-600 text-white'
-                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200'
                         }`}
                       >
                         {dietary.name}
@@ -403,7 +403,7 @@ export default function RecipesPage() {
                 <div className="pt-2 border-t">
                   <button
                     onClick={clearFilters}
-                    className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                    className="text-sm text-primary-600 hover:text-primary-700 font-medium min-h-[36px] px-2"
                   >
                     Clear all filters
                   </button>
@@ -419,7 +419,7 @@ export default function RecipesPage() {
               {selectedTags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary-100 text-primary-800"
+                  className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-primary-50 text-primary-700"
                 >
                   {tag}
                   <button onClick={() => toggleTag(tag)} className="ml-1 hover:text-primary-600">
@@ -535,8 +535,8 @@ export default function RecipesPage() {
               {recipeList.map((recipe) => (
                 <div key={recipe.id} className="recipe-card relative">
                   {/* Selection checkbox - positioned over image or inline with title */}
-                  {recipe.imageUrl ? (
-                    <div className="absolute top-2 left-2 z-10">
+                  <div className="absolute top-1 left-1 z-10">
+                    <label className="min-w-[44px] min-h-[44px] flex items-center justify-center cursor-pointer">
                       <input
                         type="checkbox"
                         checked={selectedRecipes.includes(recipe.id)}
@@ -547,33 +547,21 @@ export default function RecipesPage() {
                         onClick={(e) => e.stopPropagation()}
                         className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500 bg-white cursor-pointer"
                       />
-                    </div>
-                  ) : (
-                    <div className="absolute top-2 left-2 z-10">
-                      <input
-                        type="checkbox"
-                        checked={selectedRecipes.includes(recipe.id)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          toggleRecipeSelection(recipe.id);
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                        className="w-5 h-5 text-primary-600 border-gray-300 rounded focus:ring-primary-500 bg-white cursor-pointer"
-                      />
-                    </div>
-                  )}
+                    </label>
+                  </div>
 
                   <Link to={`/recipes/${recipe.id}`} className="block">
                     {recipe.imageUrl ? (
                       <img
                         src={recipe.imageUrl}
                         alt={recipe.title}
-                        className="w-full h-48 object-cover"
+                        className="hidden sm:block w-full h-48 object-cover"
+                        loading="lazy"
                       />
                     ) : (
-                      <div className="h-12"></div>
+                      <div className="hidden sm:block h-12"></div>
                     )}
-                    <div className={recipe.imageUrl ? 'p-4' : 'p-4 pt-8'}>
+                    <div className="p-4 pt-8 sm:pt-4">
                       <h3 className="font-semibold text-lg mb-2 line-clamp-2">{recipe.title}</h3>
                       {recipe.description && (
                         <p className="text-gray-600 text-sm mb-3 line-clamp-2">
@@ -623,7 +611,7 @@ export default function RecipesPage() {
                           {recipe.tags.slice(0, 3).map((tag) => (
                             <span
                               key={tag}
-                              className="inline-block bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded"
+                              className="inline-block bg-primary-50 text-primary-700 text-xs px-2 py-1 rounded"
                             >
                               {tag}
                             </span>

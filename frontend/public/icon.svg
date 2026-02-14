@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#4f46e5"/>
+  <g transform="translate(256,256)">
+    <!-- Fork -->
+    <g transform="translate(-60, 0)">
+      <rect x="-6" y="-140" width="12" height="280" rx="6" fill="white"/>
+      <rect x="-6" y="-140" width="12" height="80" rx="6" fill="white"/>
+      <rect x="-30" y="-140" width="12" height="80" rx="6" fill="white"/>
+      <rect x="18" y="-140" width="12" height="80" rx="6" fill="white"/>
+      <rect x="-36" y="-65" width="72" height="14" rx="7" fill="white"/>
+    </g>
+    <!-- Knife -->
+    <g transform="translate(60, 0)">
+      <rect x="-6" y="-10" width="12" height="150" rx="6" fill="white"/>
+      <path d="M-6,-140 Q-6,-10 -6,-10 L6,-10 Q18,-80 6,-140 Z" fill="white" rx="4"/>
+    </g>
+  </g>
+</svg>
