@@ -32,3 +32,7 @@ build/
 
 # Docker volumes
 postgres_data/
+
+# Local development artifacts
+backend/typescript
+pepperplate_recipes.zip
