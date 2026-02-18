@@ -84,6 +84,57 @@ export const recipesApi = {
    * @returns {Promise} - Response with ingredients array
    */
   getIngredientsForRecipes: (recipeIds) => http.post('/recipes/ingredients-preview', { recipeIds }),
+
+  /**
+   * Get all tags used by the current user's recipes
+   * @returns {Promise} - Response with tags array including recipe counts
+   */
+  getTags: () => http.get('/recipes/tags'),
+
+  /**
+   * Get all available cuisines
+   * @returns {Promise} - Response with cuisines array
+   */
+  getCuisines: () => http.get('/recipes/cuisines'),
+
+  /**
+   * Get all available meal types
+   * @returns {Promise} - Response with mealTypes array
+   */
+  getMealTypes: () => http.get('/recipes/meal-types'),
+
+  /**
+   * Get all available dietary labels
+   * @returns {Promise} - Response with dietaryLabels array
+   */
+  getDietaryLabels: () => http.get('/recipes/dietary-labels'),
+
+  /**
+   * Batch auto-tag recipes with cuisines, meal types, and dietary labels
+   * @param {Object} [options] - Options for batch tagging
+   * @param {boolean} [options.force=false] - If true, retag all recipes; if false, only uncategorized
+   * @returns {Promise} - Response with tagging results
+   */
+  batchAutoTag: (options = {}) =>
+    http.post('/recipes/batch-autotag', options, {
+      timeout: 300000,
+    }),
+
+  /**
+   * Import recipes from a Pepperplate export zip file
+   * @param {File} file - The zip file to import
+   * @returns {Promise} - Response with import results
+   */
+  importFromPepperplate: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return http.post('/import/pepperplate', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 300000, // 5 minute timeout for large imports
+    });
+  },
 };
 
 export default recipesApi;

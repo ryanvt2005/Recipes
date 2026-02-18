@@ -83,6 +83,33 @@ describe('parseQuantity', () => {
       expect(parseQuantity(' 1/2 ')).toBe(0.5);
     });
   });
+
+  describe('vague quantities', () => {
+    test('parses "a few" as approximately 3', () => {
+      expect(parseQuantity('a few')).toBe(3);
+    });
+
+    test('parses "a couple" as 2', () => {
+      expect(parseQuantity('a couple')).toBe(2);
+    });
+
+    test('parses "several" as approximately 4', () => {
+      expect(parseQuantity('several')).toBe(4);
+    });
+
+    test('parses "a pinch" as small amount', () => {
+      expect(parseQuantity('a pinch')).toBe(0.125);
+    });
+
+    test('parses "a handful" as approximately 0.5', () => {
+      expect(parseQuantity('a handful')).toBe(0.5);
+    });
+
+    test('parses quantity modifiers', () => {
+      expect(parseQuantity('heaping')).toBe(1.25);
+      expect(parseQuantity('scant')).toBe(0.875);
+    });
+  });
 });
 
 describe('normalizeUnit', () => {
@@ -202,18 +229,71 @@ describe('parseIngredientString', () => {
   });
 
   describe('unitless ingredients', () => {
-    test('parses count ingredients', () => {
+    test('parses count ingredients with inferred unit', () => {
+      // Phase 1 improvement: countable ingredients now infer "piece" unit
       const result = parseIngredientString('2 eggs');
       expect(result.quantity).toBe(2);
-      expect(result.unit).toBeNull();
+      expect(result.unit).toBe('piece'); // Inferred for countable items
       expect(result.ingredient).toBe('eggs');
     });
 
-    test('parses ingredients without quantity', () => {
+    test('parses non-countable ingredients without unit', () => {
+      // Items not in COUNTABLE_INGREDIENTS still have no unit
+      const result = parseIngredientString('2 cups flour');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('flour');
+    });
+
+    test('parses "to taste" ingredients', () => {
+      // Phase 1 improvement: "to taste" patterns are now detected
       const result = parseIngredientString('salt to taste');
       expect(result.quantity).toBeNull();
       expect(result.unit).toBeNull();
-      expect(result.ingredient).toBe('salt to taste');
+      expect(result.ingredient).toBe('salt');
+      expect(result.notes).toBe('to taste');
+    });
+
+    test('parses "as needed" ingredients', () => {
+      const result = parseIngredientString('olive oil as needed');
+      expect(result.quantity).toBeNull();
+      expect(result.unit).toBeNull();
+      expect(result.ingredient).toBe('olive oil');
+      expect(result.notes).toBe('as needed');
+    });
+  });
+
+  describe('vague quantity ingredients', () => {
+    test('parses "a few cloves of garlic"', () => {
+      const result = parseIngredientString('a few cloves of garlic');
+      expect(result.quantity).toBe(3); // "a few" = 3
+      expect(result.unit).toBe('clove');
+      expect(result.ingredient).toBe('garlic');
+    });
+
+    test('parses "several stalks of celery"', () => {
+      const result = parseIngredientString('several stalks celery');
+      expect(result.quantity).toBe(4); // "several" = 4
+      expect(result.unit).toBe('stalk');
+      expect(result.ingredient).toBe('celery');
+    });
+
+    test('parses "a pinch of salt"', () => {
+      const result = parseIngredientString('a pinch of salt');
+      expect(result.quantity).toBe(0.125);
+      expect(result.ingredient).toBe('salt');
+    });
+
+    test('parses "a handful of spinach"', () => {
+      const result = parseIngredientString('a handful spinach');
+      expect(result.quantity).toBe(0.5);
+      expect(result.ingredient).toBe('spinach');
+    });
+
+    test('parses "a couple eggs"', () => {
+      const result = parseIngredientString('a couple eggs');
+      expect(result.quantity).toBe(2);
+      expect(result.ingredient).toBe('eggs');
     });
   });
 
@@ -355,5 +435,138 @@ describe('decimalToFraction', () => {
   test('returns decimal for non-standard values', () => {
     // 1.57 is not close to any common fraction
     expect(decimalToFraction(1.57)).toBe('1.57');
+  });
+});
+
+describe('section header extraction', () => {
+  describe('"For the X:" patterns', () => {
+    test('extracts "For the Filling:" header and parses ingredient', () => {
+      const result = parseIngredientString('For the Filling: 2 pounds beef short ribs');
+      expect(result.group).toBe('For the Filling');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('lb');
+      expect(result.ingredient).toBe('beef short ribs');
+      expect(result.rawText).toBe('For the Filling: 2 pounds beef short ribs');
+    });
+
+    test('extracts "For the Sauce:" header', () => {
+      const result = parseIngredientString('For the Sauce: 1 cup tomato paste');
+      expect(result.group).toBe('For the Sauce');
+      expect(result.quantity).toBe(1);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('tomato paste');
+    });
+
+    test('extracts "For Topping:" header (without "the")', () => {
+      const result = parseIngredientString('For Topping: 1/2 cup shredded cheese');
+      expect(result.group).toBe('For Topping');
+      expect(result.quantity).toBe(0.5);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('shredded cheese');
+    });
+
+    test('extracts multi-word section names', () => {
+      const result = parseIngredientString('For the Pie Crust: 2 cups flour');
+      expect(result.group).toBe('For the Pie Crust');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('flour');
+    });
+  });
+
+  describe('direct section name patterns', () => {
+    test('extracts "Filling:" header', () => {
+      const result = parseIngredientString('Filling: 3 eggs');
+      expect(result.group).toBe('Filling');
+      expect(result.quantity).toBe(3);
+      expect(result.unit).toBe('piece'); // eggs are countable
+      expect(result.ingredient).toBe('eggs');
+    });
+
+    test('extracts "Sauce:" header', () => {
+      const result = parseIngredientString('Sauce: 2 tbsp olive oil');
+      expect(result.group).toBe('Sauce');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('tbsp');
+      expect(result.ingredient).toBe('olive oil');
+    });
+
+    test('extracts "Marinade:" header', () => {
+      const result = parseIngredientString('Marinade: 1/4 cup soy sauce');
+      expect(result.group).toBe('Marinade');
+      expect(result.quantity).toBe(0.25);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('soy sauce');
+    });
+
+    test('extracts "Frosting:" header', () => {
+      const result = parseIngredientString('Frosting: 1 cup powdered sugar');
+      expect(result.group).toBe('Frosting');
+      expect(result.quantity).toBe(1);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('powdered sugar');
+    });
+
+    test('extracts "Spice Mix:" header', () => {
+      const result = parseIngredientString('Spice Mix: 1 tsp cumin');
+      expect(result.group).toBe('Spice Mix');
+      expect(result.quantity).toBe(1);
+      expect(result.unit).toBe('tsp');
+      expect(result.ingredient).toBe('cumin');
+    });
+  });
+
+  describe('header-only lines (group markers)', () => {
+    test('recognizes header-only line as group marker', () => {
+      const result = parseIngredientString('For the Filling:');
+      expect(result.group).toBe('For the Filling');
+      expect(result.ingredient).toBe('');
+      expect(result.isGroupHeader).toBe(true);
+    });
+
+    test('recognizes "Sauce:" as group marker', () => {
+      const result = parseIngredientString('Sauce:');
+      expect(result.group).toBe('Sauce');
+      expect(result.ingredient).toBe('');
+      expect(result.isGroupHeader).toBe(true);
+    });
+  });
+
+  describe('ingredients without headers (no change)', () => {
+    test('regular ingredient without header has null group', () => {
+      const result = parseIngredientString('2 cups flour');
+      expect(result.group).toBeNull();
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('flour');
+    });
+
+    test('does not falsely detect headers in normal text', () => {
+      // Make sure "For" in the middle of text is not a header
+      const result = parseIngredientString('2 cups flour for baking');
+      expect(result.group).toBeNull();
+      expect(result.ingredient).toBe('flour for baking');
+    });
+  });
+
+  describe('header with to-taste ingredients', () => {
+    test('extracts header from to-taste ingredient', () => {
+      const result = parseIngredientString('For the Rub: salt to taste');
+      expect(result.group).toBe('For the Rub');
+      expect(result.ingredient).toBe('salt');
+      expect(result.notes).toBe('to taste');
+      expect(result.quantity).toBeNull();
+    });
+  });
+
+  describe('header with preparation notes', () => {
+    test('extracts header and preparation', () => {
+      const result = parseIngredientString('For the Sauce: 2 cups tomatoes, diced');
+      expect(result.group).toBe('For the Sauce');
+      expect(result.quantity).toBe(2);
+      expect(result.unit).toBe('cup');
+      expect(result.ingredient).toBe('tomatoes');
+      expect(result.preparation).toBe('diced');
+    });
   });
 });

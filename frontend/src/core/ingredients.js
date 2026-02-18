@@ -198,10 +198,17 @@ export function decimalToFraction(decimal) {
  * Format quantity and unit for display
  * @param {number|null|undefined} quantity - Numeric quantity
  * @param {string|null|undefined} unit - Unit string
+ * @param {Object} [options] - Display options
+ * @param {boolean} [options.showAsNeeded=false] - Show "as needed" for null quantities
  * @returns {string} Formatted display string (e.g., "1 ½ cups", "2 lbs")
  */
-export function formatQuantityWithUnit(quantity, unit) {
+export function formatQuantityWithUnit(quantity, unit, options = {}) {
+  const { showAsNeeded = false } = options;
+
   if (quantity === null || quantity === undefined) {
+    if (showAsNeeded) {
+      return unit ? `${unit} (as needed)` : 'as needed';
+    }
     return unit || '';
   }
 
@@ -364,15 +371,21 @@ export function formatScaledIngredient(ingredient, showOriginal = false) {
   if (isScaled && showOriginal) {
     const originalParts = [];
     originalParts.push(decimalToFraction(ingredient.originalQuantity));
-    if (ingredient.unit) {
-      originalParts.push(ingredient.unit);
+    // Use originalUnit if unit was converted, otherwise use current unit
+    const unitToShow = ingredient.originalUnit || ingredient.unit;
+    if (unitToShow) {
+      originalParts.push(unitToShow);
     }
     originalDisplay = originalParts.join(' ');
   }
+
+  // Check if unit was converted (e.g., tsp → tbsp)
+  const unitConverted = ingredient.unitConverted === true;
 
   return {
     display,
     scaled: isScaled,
     originalDisplay,
+    unitConverted,
   };
 }

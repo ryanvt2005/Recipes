@@ -7,6 +7,7 @@ const {
   normalizeIngredientName,
   areUnitsCompatible,
 } = require('../utils/ingredientAggregator');
+const { toNumber } = require('../utils/ingredientParser');
 
 /**
  * Parse quantity from ingredient text
@@ -193,14 +194,8 @@ function consolidateIngredients(recipeIngredients, options = {}) {
     const parsed = parseIngredient(ing.raw_text, ing.ingredient_name);
     // Prefer database quantity/unit over parsed values (database has the authoritative data)
     // Only use parsed values as fallback if database values are missing
-    // Ensure quantity is a number, not a string (PostgreSQL numeric can return as string)
-    let quantity = ing.quantity ?? parsed.quantity;
-    if (quantity !== null && quantity !== undefined) {
-      quantity = typeof quantity === 'string' ? parseFloat(quantity) : Number(quantity);
-      if (isNaN(quantity)) {
-        quantity = null;
-      }
-    }
+    // Use centralized toNumber for consistent PostgreSQL string handling
+    const quantity = toNumber(ing.quantity ?? parsed.quantity);
 
     return {
       recipeId: ing.recipe_id,
@@ -543,6 +538,37 @@ async function updateItem(req, res) {
 }
 
 /**
+ * Delete a single item from a shopping list
+ */
+async function deleteItem(req, res) {
+  const { id } = req.params;
+  const userId = req.user.userId;
+
+  try {
+    // Verify the item belongs to the user's shopping list
+    const verifyResult = await pool.query(
+      `SELECT sli.id, sl.id as list_id FROM shopping_list_items sli
+       INNER JOIN shopping_lists sl ON sli.shopping_list_id = sl.id
+       WHERE sli.id = $1 AND sl.user_id = $2`,
+      [id, userId]
+    );
+
+    if (verifyResult.rows.length === 0) {
+      return errors.notFound(res, 'Shopping list item not found');
+    }
+
+    // Delete the item
+    await pool.query('DELETE FROM shopping_list_items WHERE id = $1', [id]);
+
+    logger.info('Shopping list item deleted', { userId, itemId: id });
+    res.json({ message: 'Item deleted successfully' });
+  } catch (error) {
+    logger.error('Error deleting shopping list item', { error: error.message });
+    return errors.internal(res, 'Failed to delete item');
+  }
+}
+
+/**
  * Delete a shopping list
  */
 async function deleteShoppingList(req, res) {
@@ -722,14 +748,13 @@ async function addRecipesToList(req, res) {
       if (mergedItems[key]) {
         // Check if units are compatible for summing
         if (areUnitsCompatible(mergedItems[key].unit, ing.unit)) {
-          // Update existing item quantity - ensure numeric addition, not string concatenation
-          const existingQty =
-            mergedItems[key].quantity !== null ? Number(mergedItems[key].quantity) : null;
-          const newQty = ing.quantity !== null ? Number(ing.quantity) : null;
+          // Update existing item quantity using centralized coercion
+          const existingQty = toNumber(mergedItems[key].quantity);
+          const newQty = toNumber(ing.quantity);
 
-          if (newQty !== null && !isNaN(newQty) && existingQty !== null && !isNaN(existingQty)) {
+          if (newQty !== null && existingQty !== null) {
             mergedItems[key].quantity = existingQty + newQty;
-          } else if (newQty !== null && !isNaN(newQty)) {
+          } else if (newQty !== null) {
             mergedItems[key].quantity = newQty;
           }
           // Update notes if we have component breakdown
@@ -1137,6 +1162,7 @@ module.exports = {
   getUserShoppingLists,
   getShoppingList,
   updateItem,
+  deleteItem,
   deleteShoppingList,
   addRecipesToList,
   removeRecipeFromList,

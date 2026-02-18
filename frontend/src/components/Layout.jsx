@@ -18,12 +18,12 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-white shadow-sm sticky top-0 z-40">
+      <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Logo */}
             <Link to="/" className="flex items-center flex-shrink-0">
-              <span className="text-xl sm:text-2xl font-bold text-primary-600">Recipe Manager</span>
+              <span className="text-xl font-semibold text-gray-900">Recipe Manager</span>
             </Link>
 
             {/* Desktop Navigation */}
@@ -106,13 +106,13 @@ export default function Layout({ children }) {
       />
 
       <main className="flex-1">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">{children}</div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">{children}</div>
       </main>
 
-      <footer className="bg-white border-t border-gray-200 mt-auto">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <p className="text-center text-gray-500 text-sm">
-            © 2026 Recipe Manager. Built with React + Node.js + Claude AI.
+      <footer className="border-t border-gray-100 mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <p className="text-center text-gray-400 text-xs">
+            &copy; 2026 Recipe Manager
           </p>
         </div>
       </footer>

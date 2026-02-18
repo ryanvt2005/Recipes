@@ -17,6 +17,54 @@
  */
 
 /**
+ * Vague quantity words mapped to approximate numeric values
+ * These are common in recipes but imprecise
+ */
+const VAGUE_QUANTITIES = {
+  // Small amounts
+  'a pinch': 0.125, // ~1/8 tsp equivalent
+  'pinch': 0.125,
+  'a dash': 0.125,
+  'dash': 0.125,
+  'a splash': 1, // ~1 tbsp equivalent
+  'splash': 1,
+  'a drizzle': 1,
+  'drizzle': 1,
+  'a drop': 0.05,
+  'drop': 0.05,
+  'few drops': 0.15,
+  'a few drops': 0.15,
+
+  // Count-based vague quantities
+  'a few': 3,
+  'few': 3,
+  'a couple': 2,
+  'couple': 2,
+  'several': 4,
+  'some': 3,
+  'a handful': 0.5, // ~1/2 cup equivalent
+  'handful': 0.5,
+
+  // Approximate amounts
+  'a little': 1,
+  'little': 1,
+  'a bit': 1,
+  'bit': 1,
+  'a small amount': 1,
+  'small amount': 1,
+  'a generous amount': 2,
+  'generous amount': 2,
+  'a heaping': 1.25, // ~25% more than level
+  'heaping': 1.25,
+  'a scant': 0.875, // ~slightly less than full
+  'scant': 0.875,
+  'a rounded': 1.1,
+  'rounded': 1.1,
+  'a level': 1,
+  'level': 1,
+};
+
+/**
  * Unicode fraction to decimal mapping
  */
 const UNICODE_FRACTIONS = {
@@ -151,6 +199,72 @@ const UNIT_MAP = {
 };
 
 /**
+ * Patterns indicating "to taste" or optional quantities
+ * These ingredients should have null quantity but preserve the phrase
+ */
+const TO_TASTE_PATTERNS = [
+  /\bto\s+taste\b/i,
+  /\bas\s+needed\b/i,
+  /\bto\s+your\s+(liking|preference)\b/i,
+  /\boptional\b/i,
+  /\bfor\s+garnish\b/i,
+  /\bfor\s+serving\b/i,
+];
+
+/**
+ * Common countable ingredients that should infer "piece" unit when unitless
+ */
+const COUNTABLE_INGREDIENTS = new Set([
+  'egg',
+  'eggs',
+  'banana',
+  'bananas',
+  'apple',
+  'apples',
+  'orange',
+  'oranges',
+  'lemon',
+  'lemons',
+  'lime',
+  'limes',
+  'onion',
+  'onions',
+  'potato',
+  'potatoes',
+  'tomato',
+  'tomatoes',
+  'carrot',
+  'carrots',
+  'avocado',
+  'avocados',
+  'cucumber',
+  'cucumbers',
+  'zucchini',
+  'bell pepper',
+  'bell peppers',
+  'jalapeño',
+  'jalapeños',
+  'jalapeno',
+  'jalapenos',
+  'shallot',
+  'shallots',
+]);
+
+/**
+ * Section header patterns that may be concatenated with ingredient text
+ * These indicate the start of a recipe section (e.g., "For the Filling:", "Sauce:")
+ * Captured as group name and stripped from ingredient text
+ */
+const SECTION_HEADER_PATTERNS = [
+  // "For the X:" or "For X:" patterns (most common)
+  /^(For\s+(?:the\s+)?[A-Za-z]+(?:\s+[A-Za-z]+)?)\s*:\s*/i,
+  // Common section names followed by colon
+  /^((?:Filling|Sauce|Topping|Crust|Dough|Frosting|Glaze|Marinade|Dressing|Batter|Coating|Garnish|Stuffing|Assembly|Base|Crumble|Streusel|Cream|Custard|Syrup|Gravy|Rub|Seasoning|Spice\s*Mix))\s*:\s*/i,
+  // "X Ingredients:" pattern
+  /^([A-Za-z]+(?:\s+[A-Za-z]+)?\s+Ingredients)\s*:\s*/i,
+];
+
+/**
  * Words that are NOT units but might look like them
  * These should be treated as part of the ingredient name
  */
@@ -235,7 +349,7 @@ function normalizeUnit(unit) {
 
 /**
  * Parse a quantity string into a number
- * Handles fractions, mixed numbers, ranges, and Unicode fractions
+ * Handles fractions, mixed numbers, ranges, Unicode fractions, and vague quantities
  *
  * @param {string} quantityStr - Raw quantity string
  * @returns {number|null} Parsed numeric value or null
@@ -246,12 +360,26 @@ function parseQuantity(quantityStr) {
   }
 
   let str = String(quantityStr).trim();
+  const lowerStr = str.toLowerCase();
+
+  // Check for vague quantities first (e.g., "a few", "several", "a pinch")
+  for (const [phrase, value] of Object.entries(VAGUE_QUANTITIES)) {
+    if (lowerStr === phrase || lowerStr.startsWith(phrase + ' ')) {
+      return value;
+    }
+  }
+
+  // Normalize spacing around Unicode fractions (handle "1 ½" and "1½" consistently)
+  for (const frac of Object.keys(UNICODE_FRACTIONS)) {
+    // Normalize "1 ½" to "1½" for consistent parsing
+    str = str.replace(new RegExp(`(\\d+)\\s+${frac}`, 'g'), `$1${frac}`);
+  }
 
   // Replace Unicode fractions with decimals
   for (const [frac, decimal] of Object.entries(UNICODE_FRACTIONS)) {
     if (str.includes(frac)) {
-      // Handle mixed numbers like "1½" or "1 ½"
-      const mixedMatch = str.match(new RegExp(`(\\d+)\\s*${frac}`));
+      // Handle mixed numbers like "1½"
+      const mixedMatch = str.match(new RegExp(`(\\d+)${frac}`));
       if (mixedMatch) {
         return parseInt(mixedMatch[1], 10) + decimal;
       }
@@ -315,15 +443,89 @@ function parseIngredientString(rawText, sortOrder = 0) {
 
   const original = rawText.trim();
 
+  // Check for embedded section headers (e.g., "For the Filling: 2 cups flour")
+  // Extract as group name and clean the ingredient text
+  let extractedGroup = null;
+  let cleanedText = original;
+
+  for (const pattern of SECTION_HEADER_PATTERNS) {
+    const headerMatch = original.match(pattern);
+    if (headerMatch) {
+      extractedGroup = headerMatch[1].trim();
+      cleanedText = original.substring(headerMatch[0].length).trim();
+      break;
+    }
+  }
+
+  // If the cleaned text is empty after removing header, the whole line was just a header
+  // Return it as a group marker (no actual ingredient)
+  if (extractedGroup && !cleanedText) {
+    return {
+      rawText: original,
+      sortOrder,
+      quantity: null,
+      unit: null,
+      ingredient: '',
+      preparation: null,
+      group: extractedGroup,
+      isGroupHeader: true,
+    };
+  }
+
+  // Use cleaned text for further parsing
+  const textToParse = cleanedText;
+
+  // Check for "to taste" patterns - these have null quantity
+  let matchedToTastePhrase = null;
+  const toTastePhrasePatterns = [
+    { regex: /\bto\s+taste\b/i, phrase: 'to taste' },
+    { regex: /\bas\s+needed\b/i, phrase: 'as needed' },
+    { regex: /\bto\s+your\s+(liking|preference)\b/i, phrase: 'to taste' },
+    { regex: /\boptional\b/i, phrase: 'optional' },
+    { regex: /\bfor\s+garnish\b/i, phrase: 'for garnish' },
+    { regex: /\bfor\s+serving\b/i, phrase: 'for serving' },
+  ];
+
+  for (const { regex, phrase } of toTastePhrasePatterns) {
+    if (regex.test(textToParse)) {
+      matchedToTastePhrase = phrase;
+      break;
+    }
+  }
+
+  // If "to taste" pattern found, return early with the full text as ingredient
+  if (matchedToTastePhrase) {
+    // Try to extract the ingredient name (remove the "to taste" part for cleaner display)
+    let ingredientName = textToParse
+      .replace(
+        /,?\s*(to\s+taste|as\s+needed|to\s+your\s+(liking|preference)|optional|for\s+garnish|for\s+serving)/gi,
+        ''
+      )
+      .trim();
+    // Remove trailing comma if any
+    ingredientName = ingredientName.replace(/,\s*$/, '').trim();
+
+    return {
+      rawText: original,
+      sortOrder,
+      quantity: null,
+      unit: null,
+      ingredient: ingredientName || textToParse,
+      preparation: null,
+      notes: matchedToTastePhrase,
+      group: extractedGroup,
+    };
+  }
+
   // First, try to split by comma for preparation notes
   // e.g., "2 cups flour, sifted" → ingredient: "flour", preparation: "sifted"
-  let mainPart = original;
+  let mainPart = textToParse;
   let preparation = null;
 
-  const commaIndex = original.indexOf(',');
+  const commaIndex = textToParse.indexOf(',');
   if (commaIndex > 0) {
-    mainPart = original.substring(0, commaIndex).trim();
-    preparation = original.substring(commaIndex + 1).trim();
+    mainPart = textToParse.substring(0, commaIndex).trim();
+    preparation = textToParse.substring(commaIndex + 1).trim();
   }
 
   // Also check for parenthetical notes
@@ -333,19 +535,34 @@ function parseIngredientString(rawText, sortOrder = 0) {
     preparation = preparation ? `${parenMatch[2]}, ${preparation}` : parenMatch[2];
   }
 
-  // Build regex pattern for quantity detection
-  // Matches: numbers, fractions, mixed numbers, Unicode fractions, ranges
-  const quantityPattern =
-    /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+\.?\d*\s*[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|\d+\.?\d*(?:\s*(?:-|to|or)\s*\d+\.?\d*)?)\s*/i;
-
-  const quantityMatch = mainPart.match(quantityPattern);
-
+  // Check for vague quantity phrases first (e.g., "a few cloves of garlic")
   let quantity = null;
   let remainingText = mainPart;
+  let vagueQuantityMatched = false;
 
-  if (quantityMatch) {
-    quantity = parseQuantity(quantityMatch[1]);
-    remainingText = mainPart.substring(quantityMatch[0].length).trim();
+  const lowerMainPart = mainPart.toLowerCase();
+  for (const [phrase, value] of Object.entries(VAGUE_QUANTITIES)) {
+    if (lowerMainPart.startsWith(phrase + ' ') || lowerMainPart === phrase) {
+      quantity = value;
+      remainingText = mainPart.substring(phrase.length).trim();
+      vagueQuantityMatched = true;
+      break;
+    }
+  }
+
+  // If no vague quantity, try numeric quantity detection
+  if (!vagueQuantityMatched) {
+    // Build regex pattern for quantity detection
+    // Matches: numbers, fractions, mixed numbers, Unicode fractions, ranges
+    const quantityPattern =
+      /^(\d+\s+\d+\/\d+|\d+\/\d+|\d+\.?\d*\s*[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|[½⅓⅔¼¾⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞]|\d+\.?\d*(?:\s*(?:-|to|or)\s*\d+\.?\d*)?)\s*/i;
+
+    const quantityMatch = mainPart.match(quantityPattern);
+
+    if (quantityMatch) {
+      quantity = parseQuantity(quantityMatch[1]);
+      remainingText = mainPart.substring(quantityMatch[0].length).trim();
+    }
   }
 
   // Now try to extract unit from the remaining text
@@ -380,9 +597,17 @@ function parseIngredientString(rawText, sortOrder = 0) {
     ingredientName = ingredientName.substring(3).trim();
   }
 
-  // If we still don't have an ingredient name, use the whole original text
+  // If we still don't have an ingredient name, use the cleaned text (or original if no header)
   if (!ingredientName) {
-    ingredientName = original;
+    ingredientName = textToParse || original;
+  }
+
+  // Infer "piece" unit for countable ingredients that have quantity but no unit
+  if (quantity !== null && !unit) {
+    const lowerIngredient = ingredientName.toLowerCase();
+    if (COUNTABLE_INGREDIENTS.has(lowerIngredient)) {
+      unit = 'piece';
+    }
   }
 
   return {
@@ -392,7 +617,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
     unit,
     ingredient: ingredientName,
     preparation,
-    group: null,
+    group: extractedGroup,
   };
 }
 
@@ -499,6 +724,21 @@ function decimalToFraction(decimal) {
   return formatQuantityDisplay(decimal);
 }
 
+/**
+ * Safely coerce a value to a number
+ * Handles strings from PostgreSQL, null/undefined, and invalid values
+ *
+ * @param {any} value - Value to coerce
+ * @returns {number|null} Numeric value or null if invalid
+ */
+function toNumber(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
+  return isNaN(num) ? null : num;
+}
+
 module.exports = {
   parseIngredientString,
   parseQuantity,
@@ -506,6 +746,11 @@ module.exports = {
   formatIngredientDisplay,
   formatQuantityDisplay,
   decimalToFraction,
+  toNumber,
   UNIT_MAP,
   UNICODE_FRACTIONS,
+  TO_TASTE_PATTERNS,
+  COUNTABLE_INGREDIENTS,
+  VAGUE_QUANTITIES,
+  SECTION_HEADER_PATTERNS,
 };

@@ -27,6 +27,9 @@ router.post('/:id/recompute', shoppingListController.recomputeShoppingList);
 // Update shopping list item (check/uncheck, add notes)
 router.patch('/items/:id', shoppingListController.updateItem);
 
+// Delete a single shopping list item
+router.delete('/items/:id', shoppingListController.deleteItem);
+
 // Delete shopping list
 router.delete('/:id', shoppingListController.deleteShoppingList);
 

@@ -2,9 +2,12 @@ const Anthropic = require('@anthropic-ai/sdk');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const crypto = require('crypto');
+const { execSync } = require('child_process');
 const pool = require('../config/database');
 const logger = require('../config/logger');
 const { parseIngredientString: parseIngredient } = require('../utils/ingredientParser');
+const { extractFromWPRM } = require('./extractors/wpRecipeMakerExtractor');
+const { autoTagRecipe } = require('../utils/recipeAutoTagger');
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -100,6 +103,43 @@ async function saveToCache(url, data, extractionMethod) {
 }
 
 /**
+ * Fetch HTML using curl as a fallback for sites that block axios
+ * Some sites (e.g., Cloudflare-protected) detect Node.js via TLS fingerprinting
+ * but allow curl requests.
+ *
+ * Note: Simpler headers often work better with Cloudflare - overly detailed
+ * browser headers can trigger additional challenges.
+ */
+function fetchWithCurl(url) {
+  // Escape URL for shell (replace single quotes)
+  const escapedUrl = url.replace(/'/g, "'\\''");
+
+  // Use minimal headers - paradoxically, simpler headers often bypass Cloudflare better
+  // than full browser fingerprints which can appear suspicious
+  const curlCmd = `curl -sL --max-time 15 --max-redirs 5 \
+    -H 'User-Agent: Mozilla/5.0 (compatible; RecipeApp/1.0)' \
+    --compressed \
+    '${escapedUrl}'`;
+
+  try {
+    const result = execSync(curlCmd, {
+      encoding: 'utf8',
+      timeout: 20000,
+      maxBuffer: 10 * 1024 * 1024, // 10MB max
+    });
+
+    // Check if we got a Cloudflare challenge page instead of real content
+    if (result.includes('Just a moment...') || result.includes('Checking your browser')) {
+      throw new Error('Cloudflare challenge page received');
+    }
+
+    return result;
+  } catch (err) {
+    throw new Error(`curl failed: ${err.message}`);
+  }
+}
+
+/**
  * Fetch HTML from URL
  */
 async function fetchHtml(url) {
@@ -132,13 +172,75 @@ async function fetchHtml(url) {
 
     return response.data;
   } catch (error) {
-    logger.error('Failed to fetch URL', {
+    const status = error.response?.status;
+    logger.error('Failed to fetch URL with axios', {
       url,
       error: error.message,
-      status: error.response?.status,
+      status,
     });
+
+    // For 403 errors, try curl as a fallback (bypasses TLS fingerprinting)
+    if (status === 403) {
+      logger.info('Trying curl fallback for blocked site', { url });
+      try {
+        const html = fetchWithCurl(url);
+        if (html && html.length > 100) {
+          logger.info('Successfully fetched with curl fallback', { url, bytes: html.length });
+          return html;
+        }
+      } catch (curlError) {
+        logger.warn('Curl fallback also failed', { url, error: curlError.message });
+      }
+      // If curl also fails, throw the original error
+      throw new RecipeExtractionError(
+        'This website blocks automated access. Try copying the recipe manually.',
+        'URL_BLOCKED',
+        `HTTP 403 Forbidden - The site has anti-scraping protection`
+      );
+    }
+
+    if (status === 404) {
+      throw new RecipeExtractionError(
+        'Recipe page not found. Please check the URL and try again.',
+        'URL_NOT_FOUND',
+        `HTTP 404 - The page may have been moved or deleted`
+      );
+    }
+
+    if (status === 429) {
+      throw new RecipeExtractionError(
+        'Too many requests to this website. Please wait a moment and try again.',
+        'URL_RATE_LIMITED',
+        `HTTP 429 - Rate limited by the recipe website`
+      );
+    }
+
+    if (status >= 500) {
+      throw new RecipeExtractionError(
+        'The recipe website is temporarily unavailable. Please try again later.',
+        'URL_SERVER_ERROR',
+        `HTTP ${status} - The recipe website returned a server error`
+      );
+    }
+
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      throw new RecipeExtractionError(
+        'The request timed out. The website may be slow or unavailable.',
+        'URL_TIMEOUT',
+        'Request exceeded the 15-second timeout'
+      );
+    }
+
+    if (error.code === 'ENOTFOUND' || error.code === 'ERR_BAD_REQUEST') {
+      throw new RecipeExtractionError(
+        'Invalid URL. Please check the web address and try again.',
+        'URL_INVALID',
+        error.message
+      );
+    }
+
     throw new RecipeExtractionError(
-      'Could not fetch the webpage',
+      'Could not fetch the webpage. Please check the URL and try again.',
       'URL_FETCH_FAILED',
       error.message
     );
@@ -216,7 +318,8 @@ function parseSchemaIngredients(ingredients) {
           const text = typeof item === 'string' ? item : item.text || item.name;
           if (text) {
             const parsedIng = parseIngredientString(text, sortOrder++);
-            parsedIng.group = currentGroup;
+            // HowToSection group takes precedence, fallback to parser's embedded header
+            parsedIng.group = currentGroup || parsedIng.group;
             parsed.push(parsedIng);
           }
         });
@@ -225,13 +328,15 @@ function parseSchemaIngredients(ingredients) {
     // Handle plain string
     else if (typeof ingredient === 'string') {
       const parsedIng = parseIngredientString(ingredient, sortOrder++);
-      parsedIng.group = currentGroup;
+      // Preserve group from parser (embedded header) if no HowToSection group
+      parsedIng.group = currentGroup || parsedIng.group;
       parsed.push(parsedIng);
     }
     // Handle object with text property
     else if (typeof ingredient === 'object' && ingredient.text) {
       const parsedIng = parseIngredientString(ingredient.text, sortOrder++);
-      parsedIng.group = currentGroup;
+      // Preserve group from parser (embedded header) if no HowToSection group
+      parsedIng.group = currentGroup || parsedIng.group;
       parsed.push(parsedIng);
     }
   });
@@ -289,38 +394,230 @@ function parseIngredientString(rawText, sortOrder = 0) {
 }
 
 /**
+ * Parse recipeYield into a clean servings string
+ * Handles arrays, numbers, and various string formats
+ *
+ * Examples:
+ *   ["4", "4 servings"] → "4"
+ *   "4 servings" → "4"
+ *   "Makes 12 cookies" → "12"
+ *   4 → "4"
+ *   "4-6 servings" → "4-6"
+ *   "6 to 8" → "6-8"
+ */
+function parseServings(recipeYield) {
+  if (recipeYield === null || recipeYield === undefined) {
+    return null;
+  }
+
+  let raw;
+
+  // Handle arrays - pick the shortest numeric entry (usually just the number)
+  if (Array.isArray(recipeYield)) {
+    // Find the first entry that is just a number
+    const numericEntry = recipeYield.find((entry) => /^\d+$/.test(String(entry).trim()));
+    if (numericEntry) {
+      return String(numericEntry);
+    }
+
+    // Otherwise use the first entry
+    raw = String(recipeYield[0]);
+  } else {
+    raw = String(recipeYield);
+  }
+
+  raw = raw.trim();
+
+  // Already a clean number
+  if (/^\d+$/.test(raw)) {
+    return raw;
+  }
+
+  // Range: "4-6 servings" or "4 - 6"
+  const rangeMatch = raw.match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (rangeMatch) {
+    return `${rangeMatch[1]}-${rangeMatch[2]}`;
+  }
+
+  // Range with "to": "6 to 8 servings"
+  const toRangeMatch = raw.match(/(\d+)\s+to\s+(\d+)/i);
+  if (toRangeMatch) {
+    return `${toRangeMatch[1]}-${toRangeMatch[2]}`;
+  }
+
+  // Extract first number from string like "4 servings", "Makes 12 cookies"
+  const numberMatch = raw.match(/(\d+)/);
+  if (numberMatch) {
+    return numberMatch[1];
+  }
+
+  // Return as-is if we can't parse (e.g., "a dozen")
+  return raw;
+}
+
+/**
+ * Check if an item is a Recipe type
+ */
+function isRecipeType(item) {
+  if (!item || typeof item !== 'object') {
+    return false;
+  }
+  const type = item['@type'];
+  if (type === 'Recipe') {
+    return true;
+  }
+  if (Array.isArray(type) && type.includes('Recipe')) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Resolve an @id reference within a @graph array
+ */
+function resolveIdReference(ref, graph) {
+  if (!ref || !graph || !Array.isArray(graph)) {
+    return null;
+  }
+
+  // If it's a string @id reference
+  const id = typeof ref === 'string' ? ref : ref['@id'];
+  if (!id) {
+    return ref;
+  } // Return as-is if no @id
+
+  // Find the referenced object in the graph
+  const resolved = graph.find((item) => item['@id'] === id);
+  return resolved || ref;
+}
+
+/**
+ * Extract author name from schema.org author field
+ * Handles direct values, objects, arrays, and @id references
+ */
+function extractAuthorName(authorField, graph) {
+  if (!authorField) {
+    return null;
+  }
+
+  // Direct string
+  if (typeof authorField === 'string') {
+    return authorField;
+  }
+
+  // Array of authors - take first one
+  if (Array.isArray(authorField)) {
+    const first = authorField[0];
+    if (typeof first === 'string') {
+      return first;
+    }
+    // Resolve if it's a reference
+    const resolved = resolveIdReference(first, graph);
+    return resolved?.name || null;
+  }
+
+  // Object with @id reference - resolve it
+  if (authorField['@id']) {
+    const resolved = resolveIdReference(authorField, graph);
+    return resolved?.name || null;
+  }
+
+  // Direct object with name
+  return authorField.name || null;
+}
+
+/**
+ * Calculate extraction quality score based on which fields are present
+ * Returns an object with score (0-100) and list of missing fields
+ */
+function calculateExtractionQuality(recipe) {
+  const fields = [
+    { key: 'title', weight: 20, label: 'title' },
+    { key: 'ingredients', weight: 25, label: 'ingredients', isArray: true },
+    { key: 'instructions', weight: 25, label: 'instructions', isArray: true },
+    { key: 'description', weight: 5, label: 'description' },
+    { key: 'author', weight: 5, label: 'author' },
+    { key: 'imageUrl', weight: 5, label: 'image' },
+    { key: 'servings', weight: 5, label: 'servings' },
+    { key: 'prepTime', weight: 3, label: 'prep time' },
+    { key: 'cookTime', weight: 3, label: 'cook time' },
+    { key: 'totalTime', weight: 4, label: 'total time' },
+  ];
+
+  let score = 0;
+  const missing = [];
+
+  for (const field of fields) {
+    const value = recipe[field.key];
+    const hasValue = field.isArray
+      ? Array.isArray(value) && value.length > 0
+      : value !== null && value !== undefined && value !== '';
+
+    if (hasValue) {
+      score += field.weight;
+    } else {
+      missing.push(field.label);
+    }
+  }
+
+  return { score, missing };
+}
+
+/**
  * Extract recipe from schema.org JSON-LD
+ * Supports both direct Recipe objects and @graph structures
+ * Uses partial extraction - returns what's available even if some fields are missing
  */
 function extractRecipeFromSchema(html) {
   const $ = cheerio.load(html);
   const scripts = $('script[type="application/ld+json"]');
 
+  logger.debug('Schema extraction: searching JSON-LD scripts', { count: scripts.length });
+
   for (let i = 0; i < scripts.length; i++) {
     try {
-      const jsonLd = JSON.parse($(scripts[i]).html());
-      const recipes = Array.isArray(jsonLd) ? jsonLd : [jsonLd];
+      const scriptContent = $(scripts[i]).html();
+      const jsonLd = JSON.parse(scriptContent);
 
-      const recipeData = recipes.find(
-        (item) =>
-          item['@type'] === 'Recipe' ||
-          (Array.isArray(item['@type']) && item['@type'].includes('Recipe'))
-      );
+      let candidates = [];
+      let graph = null;
+
+      // Handle @graph structure (used by many sites including WP Recipe Maker)
+      if (jsonLd['@graph'] && Array.isArray(jsonLd['@graph'])) {
+        graph = jsonLd['@graph'];
+        candidates = graph;
+      }
+      // Handle array of objects
+      else if (Array.isArray(jsonLd)) {
+        candidates = jsonLd;
+      }
+      // Handle single object
+      else {
+        candidates = [jsonLd];
+      }
+
+      // Find the Recipe object
+      const recipeData = candidates.find(isRecipeType);
 
       if (!recipeData) {
         continue;
       }
 
-      // Validate required fields
-      if (!recipeData.name || !recipeData.recipeIngredient || !recipeData.recipeInstructions) {
-        logger.warn('Incomplete schema.org recipe data');
+      // Title is the only truly required field
+      if (!recipeData.name) {
+        logger.warn('Schema.org recipe missing title, skipping');
         continue;
       }
+
+      // Extract author with @id resolution
+      const author = extractAuthorName(recipeData.author, graph);
 
       const recipe = {
         title: recipeData.name,
         description: recipeData.description || null,
+        author: author,
         imageUrl: extractImageUrl(recipeData.image),
-        servings: recipeData.recipeYield || null,
+        servings: parseServings(recipeData.recipeYield),
         prepTime: parseDuration(recipeData.prepTime),
         cookTime: parseDuration(recipeData.cookTime),
         totalTime: parseDuration(recipeData.totalTime),
@@ -328,11 +625,25 @@ function extractRecipeFromSchema(html) {
         instructions: parseSchemaInstructions(recipeData.recipeInstructions),
       };
 
-      // Final validation
-      if (recipe.ingredients.length > 0 && recipe.instructions.length > 0) {
-        logger.info('Successfully extracted recipe from schema.org');
-        return recipe;
+      // Calculate quality score
+      const quality = calculateExtractionQuality(recipe);
+      recipe.extractionQuality = quality;
+
+      // Log with quality info
+      if (quality.missing.length > 0) {
+        logger.warn('Partial recipe extraction from schema.org', {
+          title: recipe.title,
+          score: quality.score,
+          missing: quality.missing,
+        });
+      } else {
+        logger.info('Complete recipe extraction from schema.org', {
+          title: recipe.title,
+          score: quality.score,
+        });
       }
+
+      return recipe;
     } catch (error) {
       logger.warn('Failed to parse JSON-LD', { error: error.message });
       continue;
@@ -431,30 +742,43 @@ ${cleanedHtml}`;
 
     const recipe = JSON.parse(cleanedJson);
 
-    // Validate
-    if (!recipe.title || !recipe.ingredients || !recipe.instructions) {
+    // Validate - title is required, ingredients and instructions are strongly preferred
+    if (!recipe.title) {
       throw new RecipeExtractionError(
-        'Incomplete recipe extraction from LLM',
+        'Could not extract recipe title from this page.',
         'LLM_EXTRACTION_FAILED',
-        'The LLM could not extract complete recipe information'
+        'The LLM could not extract a recipe title'
       );
     }
 
-    if (recipe.ingredients.length === 0 || recipe.instructions.length === 0) {
+    if (
+      (!recipe.ingredients || recipe.ingredients.length === 0) &&
+      (!recipe.instructions || recipe.instructions.length === 0)
+    ) {
       throw new RecipeExtractionError(
-        'Recipe missing required fields',
+        'No recipe content found on this page. The URL may not contain a recipe.',
         'LLM_EXTRACTION_FAILED',
         'No ingredients or instructions found'
       );
     }
 
     // Ensure ingredients have sortOrder
-    recipe.ingredients = recipe.ingredients.map((ing, index) => ({
+    recipe.ingredients = (recipe.ingredients || []).map((ing, index) => ({
       ...ing,
       sortOrder: ing.sortOrder || index,
     }));
 
-    logger.info('Successfully extracted recipe with LLM');
+    recipe.instructions = recipe.instructions || [];
+
+    // Calculate quality score
+    const quality = calculateExtractionQuality(recipe);
+    recipe.extractionQuality = quality;
+
+    logger.info('Successfully extracted recipe with LLM', {
+      title: recipe.title,
+      score: quality.score,
+      missing: quality.missing,
+    });
     return recipe;
   } catch (error) {
     if (error instanceof RecipeExtractionError) {
@@ -472,6 +796,12 @@ ${cleanedHtml}`;
 
 /**
  * Main extraction function
+ *
+ * Extraction pipeline (in order of preference):
+ * 1. Cache - Return cached result if available
+ * 2. Schema.org JSON-LD - Fastest and most reliable
+ * 3. WP Recipe Maker HTML - Fallback for sites using WPRM plugin
+ * 4. LLM (Claude) - Last resort, most expensive but handles any format
  */
 async function extractRecipe(url) {
   // Check cache first
@@ -483,20 +813,77 @@ async function extractRecipe(url) {
   // Fetch HTML
   const html = await fetchHtml(url);
 
-  // Try schema.org extraction first
+  // Try schema.org extraction first (fastest, most reliable)
   let recipe = extractRecipeFromSchema(html);
   let extractionMethod = 'schema';
 
-  // If schema extraction failed or incomplete, fall back to LLM
+  if (recipe) {
+    const quality = recipe.extractionQuality;
+
+    // If schema extraction is missing core content (ingredients or instructions),
+    // try other methods
+    if (
+      quality &&
+      quality.missing.includes('ingredients') &&
+      quality.missing.includes('instructions')
+    ) {
+      logger.info('Schema extraction missing core fields', {
+        score: quality.score,
+        missing: quality.missing,
+      });
+      recipe = null; // Try next method
+    }
+  }
+
+  // Try WP Recipe Maker HTML extraction (common WordPress plugin)
   if (!recipe) {
-    logger.info('Schema extraction failed, falling back to LLM');
+    logger.info('Trying WP Recipe Maker HTML extraction');
+    recipe = extractFromWPRM(html);
+    if (recipe) {
+      extractionMethod = 'wprm';
+      // Calculate quality score for WPRM extraction
+      recipe.extractionQuality = calculateExtractionQuality(recipe);
+
+      // If WPRM extraction is also missing core content, continue to LLM
+      const quality = recipe.extractionQuality;
+      if (quality.missing.includes('ingredients') && quality.missing.includes('instructions')) {
+        logger.info('WPRM extraction missing core fields, falling back to LLM', {
+          score: quality.score,
+          missing: quality.missing,
+        });
+        recipe = null;
+      }
+    }
+  }
+
+  // Fall back to LLM extraction (most expensive, but handles any format)
+  if (!recipe) {
+    logger.info('Falling back to LLM extraction');
     recipe = await extractRecipeWithLLM(html);
     extractionMethod = 'llm';
+
+    // Normalize servings from LLM output
+    if (recipe.servings) {
+      recipe.servings = parseServings(recipe.servings);
+    }
   }
 
   // Add source URL and extraction method
   recipe.sourceUrl = normalizeUrl(url);
   recipe.extractionMethod = extractionMethod;
+
+  // Auto-tag with suggested categories
+  try {
+    const tags = await autoTagRecipe(recipe, pool);
+    recipe.suggestedCuisines = tags.cuisineIds;
+    recipe.suggestedMealTypes = tags.mealTypeIds;
+    recipe.suggestedDietaryLabels = tags.dietaryLabelIds;
+  } catch (tagError) {
+    logger.warn('Auto-tagging failed during extraction', { error: tagError.message });
+    recipe.suggestedCuisines = [];
+    recipe.suggestedMealTypes = [];
+    recipe.suggestedDietaryLabels = [];
+  }
 
   // Save to cache
   await saveToCache(url, recipe, extractionMethod);
@@ -507,4 +894,15 @@ async function extractRecipe(url) {
 module.exports = {
   extractRecipe,
   RecipeExtractionError,
+  // Export for testing
+  parseServings,
+  parseDuration,
+  extractImageUrl,
+  extractAuthorName,
+  resolveIdReference,
+  isRecipeType,
+  calculateExtractionQuality,
+  parseSchemaIngredients,
+  parseSchemaInstructions,
+  normalizeUrl,
 };

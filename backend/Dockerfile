@@ -25,6 +25,9 @@ RUN npm prune --production
 FROM node:20-alpine AS prod
 WORKDIR /app
 
+# Install curl for recipe extraction fallback (bypasses Cloudflare TLS fingerprinting)
+RUN apk add --no-cache curl
+
 # Copy production dependencies
 COPY --from=prod-deps /app/node_modules ./node_modules
 

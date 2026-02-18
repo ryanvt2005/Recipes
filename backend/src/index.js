@@ -7,6 +7,7 @@ const { ErrorCodes } = require('./utils/errorResponse');
 const authRoutes = require('./routes/authRoutes');
 const recipeRoutes = require('./routes/recipeRoutes');
 const shoppingListRoutes = require('./routes/shoppingListRoutes');
+const importRoutes = require('./routes/importRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -66,6 +67,7 @@ app.get('/health', (req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/recipes', recipeRoutes);
 app.use('/api/v1/shopping-lists', shoppingListRoutes);
+app.use('/api/v1/import', importRoutes);
 
 // 404 handler
 app.use((req, res) => {

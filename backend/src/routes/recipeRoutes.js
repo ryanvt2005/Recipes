@@ -8,12 +8,17 @@ const {
   updateRecipe,
   deleteRecipe,
   getIngredientsForRecipes,
+  getUserTags,
+  getCuisines,
+  getMealTypes,
+  getDietaryLabels,
 } = require('../controllers/recipeController');
 const {
   getNoteForRecipe,
   upsertNoteForRecipe,
   deleteNoteForRecipe,
 } = require('../controllers/recipeNotesController');
+const { batchAutoTag } = require('../controllers/batchTaggingController');
 const { authenticateToken } = require('../middlewares/auth');
 const {
   validate,
@@ -52,6 +57,21 @@ router.post('/', authenticateToken, validate(saveRecipeSchema), saveRecipe);
 
 // GET /api/v1/recipes - Get all recipes for user
 router.get('/', authenticateToken, getRecipes);
+
+// GET /api/v1/recipes/tags - Get all tags for user's recipes
+router.get('/tags', authenticateToken, getUserTags);
+
+// GET /api/v1/recipes/cuisines - Get all cuisines
+router.get('/cuisines', authenticateToken, getCuisines);
+
+// GET /api/v1/recipes/meal-types - Get all meal types
+router.get('/meal-types', authenticateToken, getMealTypes);
+
+// GET /api/v1/recipes/dietary-labels - Get all dietary labels
+router.get('/dietary-labels', authenticateToken, getDietaryLabels);
+
+// POST /api/v1/recipes/batch-autotag - Batch auto-tag uncategorized recipes
+router.post('/batch-autotag', authenticateToken, batchAutoTag);
 
 // GET /api/v1/recipes/:id - Get a single recipe
 router.get('/:id', authenticateToken, getRecipe);
