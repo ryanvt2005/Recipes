@@ -11,7 +11,6 @@ export default function ShoppingItemsList({
   onUpdateCategory,
   onDeleteItem,
   formatQuantity,
-  isMobile = false,
 }) {
   const [filter, setFilter] = useState('all'); // 'all' or 'unchecked'
 
