@@ -22,45 +22,45 @@
  */
 const VAGUE_QUANTITIES = {
   // Small amounts
-  "a pinch": 0.125, // ~1/8 tsp equivalent
+  'a pinch': 0.125, // ~1/8 tsp equivalent
   pinch: 0.125,
-  "a dash": 0.125,
+  'a dash': 0.125,
   dash: 0.125,
-  "a splash": 1, // ~1 tbsp equivalent
+  'a splash': 1, // ~1 tbsp equivalent
   splash: 1,
-  "a drizzle": 1,
+  'a drizzle': 1,
   drizzle: 1,
-  "a drop": 0.05,
+  'a drop': 0.05,
   drop: 0.05,
-  "few drops": 0.15,
-  "a few drops": 0.15,
+  'few drops': 0.15,
+  'a few drops': 0.15,
 
   // Count-based vague quantities
-  "a few": 3,
+  'a few': 3,
   few: 3,
-  "a couple": 2,
+  'a couple': 2,
   couple: 2,
   several: 4,
   some: 3,
-  "a handful": 0.5, // ~1/2 cup equivalent
+  'a handful': 0.5, // ~1/2 cup equivalent
   handful: 0.5,
 
   // Approximate amounts
-  "a little": 1,
+  'a little': 1,
   little: 1,
-  "a bit": 1,
+  'a bit': 1,
   bit: 1,
-  "a small amount": 1,
-  "small amount": 1,
-  "a generous amount": 2,
-  "generous amount": 2,
-  "a heaping": 1.25, // ~25% more than level
+  'a small amount': 1,
+  'small amount': 1,
+  'a generous amount': 2,
+  'generous amount': 2,
+  'a heaping': 1.25, // ~25% more than level
   heaping: 1.25,
-  "a scant": 0.875, // ~slightly less than full
+  'a scant': 0.875, // ~slightly less than full
   scant: 0.875,
-  "a rounded": 1.1,
+  'a rounded': 1.1,
   rounded: 1.1,
-  "a level": 1,
+  'a level': 1,
   level: 1,
 };
 
@@ -68,21 +68,21 @@ const VAGUE_QUANTITIES = {
  * Unicode fraction to decimal mapping
  */
 const UNICODE_FRACTIONS = {
-  "½": 0.5,
-  "⅓": 0.333,
-  "⅔": 0.666,
-  "¼": 0.25,
-  "¾": 0.75,
-  "⅕": 0.2,
-  "⅖": 0.4,
-  "⅗": 0.6,
-  "⅘": 0.8,
-  "⅙": 0.166,
-  "⅚": 0.833,
-  "⅛": 0.125,
-  "⅜": 0.375,
-  "⅝": 0.625,
-  "⅞": 0.875,
+  '½': 0.5,
+  '⅓': 0.333,
+  '⅔': 0.666,
+  '¼': 0.25,
+  '¾': 0.75,
+  '⅕': 0.2,
+  '⅖': 0.4,
+  '⅗': 0.6,
+  '⅘': 0.8,
+  '⅙': 0.166,
+  '⅚': 0.833,
+  '⅛': 0.125,
+  '⅜': 0.375,
+  '⅝': 0.625,
+  '⅞': 0.875,
 };
 
 /**
@@ -90,112 +90,112 @@ const UNICODE_FRACTIONS = {
  */
 const UNIT_MAP = {
   // Volume - teaspoon
-  teaspoon: "tsp",
-  teaspoons: "tsp",
-  tsp: "tsp",
-  tsps: "tsp",
-  t: "tsp",
+  teaspoon: 'tsp',
+  teaspoons: 'tsp',
+  tsp: 'tsp',
+  tsps: 'tsp',
+  t: 'tsp',
 
   // Volume - tablespoon
-  tablespoon: "tbsp",
-  tablespoons: "tbsp",
-  tbsp: "tbsp",
-  tbsps: "tbsp",
-  tbs: "tbsp",
-  T: "tbsp",
-  Tbsp: "tbsp",
-  Tbs: "tbsp",
+  tablespoon: 'tbsp',
+  tablespoons: 'tbsp',
+  tbsp: 'tbsp',
+  tbsps: 'tbsp',
+  tbs: 'tbsp',
+  T: 'tbsp',
+  Tbsp: 'tbsp',
+  Tbs: 'tbsp',
 
   // Volume - cup
-  cup: "cup",
-  cups: "cup",
-  c: "cup",
-  C: "cup",
+  cup: 'cup',
+  cups: 'cup',
+  c: 'cup',
+  C: 'cup',
 
   // Volume - fluid ounce
-  "fluid ounce": "fl oz",
-  "fluid ounces": "fl oz",
-  "fl oz": "fl oz",
-  floz: "fl oz",
+  'fluid ounce': 'fl oz',
+  'fluid ounces': 'fl oz',
+  'fl oz': 'fl oz',
+  floz: 'fl oz',
 
   // Volume - pint/quart/gallon
-  pint: "pint",
-  pints: "pint",
-  pt: "pint",
-  quart: "quart",
-  quarts: "quart",
-  qt: "quart",
-  gallon: "gallon",
-  gallons: "gallon",
-  gal: "gallon",
+  pint: 'pint',
+  pints: 'pint',
+  pt: 'pint',
+  quart: 'quart',
+  quarts: 'quart',
+  qt: 'quart',
+  gallon: 'gallon',
+  gallons: 'gallon',
+  gal: 'gallon',
 
   // Volume - metric
-  milliliter: "ml",
-  milliliters: "ml",
-  ml: "ml",
-  mL: "ml",
-  liter: "l",
-  liters: "l",
-  l: "l",
-  L: "l",
+  milliliter: 'ml',
+  milliliters: 'ml',
+  ml: 'ml',
+  mL: 'ml',
+  liter: 'l',
+  liters: 'l',
+  l: 'l',
+  L: 'l',
 
   // Weight - imperial
-  pound: "lb",
-  pounds: "lb",
-  lb: "lb",
-  lbs: "lb",
-  ounce: "oz",
-  ounces: "oz",
-  oz: "oz",
+  pound: 'lb',
+  pounds: 'lb',
+  lb: 'lb',
+  lbs: 'lb',
+  ounce: 'oz',
+  ounces: 'oz',
+  oz: 'oz',
 
   // Weight - metric
-  gram: "g",
-  grams: "g",
-  g: "g",
-  kilogram: "kg",
-  kilograms: "kg",
-  kg: "kg",
+  gram: 'g',
+  grams: 'g',
+  g: 'g',
+  kilogram: 'kg',
+  kilograms: 'kg',
+  kg: 'kg',
 
   // Count/container units
-  piece: "piece",
-  pieces: "piece",
-  whole: "whole",
-  large: "large",
-  medium: "medium",
-  small: "small",
-  can: "can",
-  cans: "can",
-  package: "package",
-  packages: "package",
-  pkg: "package",
-  jar: "jar",
-  jars: "jar",
-  bottle: "bottle",
-  bottles: "bottle",
-  box: "box",
-  boxes: "box",
-  bag: "bag",
-  bags: "bag",
-  bunch: "bunch",
-  bunches: "bunch",
-  head: "head",
-  heads: "head",
-  clove: "clove",
-  cloves: "clove",
-  slice: "slice",
-  slices: "slice",
-  stalk: "stalk",
-  stalks: "stalk",
-  stick: "stick",
-  sticks: "stick",
-  sprig: "sprig",
-  sprigs: "sprig",
-  pinch: "pinch",
-  pinches: "pinch",
-  dash: "dash",
-  dashes: "dash",
-  handful: "handful",
-  handfuls: "handful",
+  piece: 'piece',
+  pieces: 'piece',
+  whole: 'whole',
+  large: 'large',
+  medium: 'medium',
+  small: 'small',
+  can: 'can',
+  cans: 'can',
+  package: 'package',
+  packages: 'package',
+  pkg: 'package',
+  jar: 'jar',
+  jars: 'jar',
+  bottle: 'bottle',
+  bottles: 'bottle',
+  box: 'box',
+  boxes: 'box',
+  bag: 'bag',
+  bags: 'bag',
+  bunch: 'bunch',
+  bunches: 'bunch',
+  head: 'head',
+  heads: 'head',
+  clove: 'clove',
+  cloves: 'clove',
+  slice: 'slice',
+  slices: 'slice',
+  stalk: 'stalk',
+  stalks: 'stalk',
+  stick: 'stick',
+  sticks: 'stick',
+  sprig: 'sprig',
+  sprigs: 'sprig',
+  pinch: 'pinch',
+  pinches: 'pinch',
+  dash: 'dash',
+  dashes: 'dash',
+  handful: 'handful',
+  handfuls: 'handful',
 };
 
 /**
@@ -215,39 +215,39 @@ const TO_TASTE_PATTERNS = [
  * Common countable ingredients that should infer "piece" unit when unitless
  */
 const COUNTABLE_INGREDIENTS = new Set([
-  "egg",
-  "eggs",
-  "banana",
-  "bananas",
-  "apple",
-  "apples",
-  "orange",
-  "oranges",
-  "lemon",
-  "lemons",
-  "lime",
-  "limes",
-  "onion",
-  "onions",
-  "potato",
-  "potatoes",
-  "tomato",
-  "tomatoes",
-  "carrot",
-  "carrots",
-  "avocado",
-  "avocados",
-  "cucumber",
-  "cucumbers",
-  "zucchini",
-  "bell pepper",
-  "bell peppers",
-  "jalapeño",
-  "jalapeños",
-  "jalapeno",
-  "jalapenos",
-  "shallot",
-  "shallots",
+  'egg',
+  'eggs',
+  'banana',
+  'bananas',
+  'apple',
+  'apples',
+  'orange',
+  'oranges',
+  'lemon',
+  'lemons',
+  'lime',
+  'limes',
+  'onion',
+  'onions',
+  'potato',
+  'potatoes',
+  'tomato',
+  'tomatoes',
+  'carrot',
+  'carrots',
+  'avocado',
+  'avocados',
+  'cucumber',
+  'cucumbers',
+  'zucchini',
+  'bell pepper',
+  'bell peppers',
+  'jalapeño',
+  'jalapeños',
+  'jalapeno',
+  'jalapenos',
+  'shallot',
+  'shallots',
 ]);
 
 /**
@@ -269,62 +269,62 @@ const SECTION_HEADER_PATTERNS = [
  * These should be treated as part of the ingredient name
  */
 const NON_UNIT_WORDS = new Set([
-  "and",
-  "or",
-  "of",
-  "to",
-  "for",
-  "with",
-  "fresh",
-  "dried",
-  "ground",
-  "chopped",
-  "minced",
-  "diced",
-  "sliced",
-  "grated",
-  "shredded",
-  "crushed",
-  "melted",
-  "softened",
-  "room",
-  "temperature",
-  "cold",
-  "warm",
-  "hot",
-  "cooked",
-  "raw",
-  "ripe",
-  "unripe",
-  "peeled",
-  "seeded",
-  "pitted",
-  "boneless",
-  "skinless",
-  "lean",
-  "extra",
-  "virgin",
-  "light",
-  "dark",
-  "sweet",
-  "unsweetened",
-  "salted",
-  "unsalted",
-  "plain",
-  "all",
-  "purpose",
-  "self",
-  "rising",
-  "active",
-  "dry",
-  "instant",
-  "quick",
-  "rolled",
-  "steel",
-  "cut",
-  "old",
-  "fashioned",
-  "taste",
+  'and',
+  'or',
+  'of',
+  'to',
+  'for',
+  'with',
+  'fresh',
+  'dried',
+  'ground',
+  'chopped',
+  'minced',
+  'diced',
+  'sliced',
+  'grated',
+  'shredded',
+  'crushed',
+  'melted',
+  'softened',
+  'room',
+  'temperature',
+  'cold',
+  'warm',
+  'hot',
+  'cooked',
+  'raw',
+  'ripe',
+  'unripe',
+  'peeled',
+  'seeded',
+  'pitted',
+  'boneless',
+  'skinless',
+  'lean',
+  'extra',
+  'virgin',
+  'light',
+  'dark',
+  'sweet',
+  'unsweetened',
+  'salted',
+  'unsalted',
+  'plain',
+  'all',
+  'purpose',
+  'self',
+  'rising',
+  'active',
+  'dry',
+  'instant',
+  'quick',
+  'rolled',
+  'steel',
+  'cut',
+  'old',
+  'fashioned',
+  'taste',
 ]);
 
 /**
@@ -364,7 +364,7 @@ function parseQuantity(quantityStr) {
 
   // Check for vague quantities first (e.g., "a few", "several", "a pinch")
   for (const [phrase, value] of Object.entries(VAGUE_QUANTITIES)) {
-    if (lowerStr === phrase || lowerStr.startsWith(phrase + " ")) {
+    if (lowerStr === phrase || lowerStr.startsWith(phrase + ' ')) {
       return value;
     }
   }
@@ -372,7 +372,7 @@ function parseQuantity(quantityStr) {
   // Normalize spacing around Unicode fractions (handle "1 ½" and "1½" consistently)
   for (const frac of Object.keys(UNICODE_FRACTIONS)) {
     // Normalize "1 ½" to "1½" for consistent parsing
-    str = str.replace(new RegExp(`(\\d+)\\s+${frac}`, "g"), `$1${frac}`);
+    str = str.replace(new RegExp(`(\\d+)\\s+${frac}`, 'g'), `$1${frac}`);
   }
 
   // Replace Unicode fractions with decimals
@@ -429,13 +429,13 @@ function parseQuantity(quantityStr) {
  * @returns {Object} Parsed ingredient object
  */
 function parseIngredientString(rawText, sortOrder = 0) {
-  if (!rawText || typeof rawText !== "string") {
+  if (!rawText || typeof rawText !== 'string') {
     return {
-      rawText: rawText || "",
+      rawText: rawText || '',
       sortOrder,
       quantity: null,
       unit: null,
-      ingredient: rawText || "",
+      ingredient: rawText || '',
       preparation: null,
       group: null,
     };
@@ -465,7 +465,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
       sortOrder,
       quantity: null,
       unit: null,
-      ingredient: "",
+      ingredient: '',
       preparation: null,
       group: extractedGroup,
       isGroupHeader: true,
@@ -478,12 +478,12 @@ function parseIngredientString(rawText, sortOrder = 0) {
   // Check for "to taste" patterns - these have null quantity
   let matchedToTastePhrase = null;
   const toTastePhrasePatterns = [
-    { regex: /\bto\s+taste\b/i, phrase: "to taste" },
-    { regex: /\bas\s+needed\b/i, phrase: "as needed" },
-    { regex: /\bto\s+your\s+(liking|preference)\b/i, phrase: "to taste" },
-    { regex: /\boptional\b/i, phrase: "optional" },
-    { regex: /\bfor\s+garnish\b/i, phrase: "for garnish" },
-    { regex: /\bfor\s+serving\b/i, phrase: "for serving" },
+    { regex: /\bto\s+taste\b/i, phrase: 'to taste' },
+    { regex: /\bas\s+needed\b/i, phrase: 'as needed' },
+    { regex: /\bto\s+your\s+(liking|preference)\b/i, phrase: 'to taste' },
+    { regex: /\boptional\b/i, phrase: 'optional' },
+    { regex: /\bfor\s+garnish\b/i, phrase: 'for garnish' },
+    { regex: /\bfor\s+serving\b/i, phrase: 'for serving' },
   ];
 
   for (const { regex, phrase } of toTastePhrasePatterns) {
@@ -499,11 +499,11 @@ function parseIngredientString(rawText, sortOrder = 0) {
     let ingredientName = textToParse
       .replace(
         /,?\s*(to\s+taste|as\s+needed|to\s+your\s+(liking|preference)|optional|for\s+garnish|for\s+serving)/gi,
-        "",
+        ''
       )
       .trim();
     // Remove trailing comma if any
-    ingredientName = ingredientName.replace(/,\s*$/, "").trim();
+    ingredientName = ingredientName.replace(/,\s*$/, '').trim();
 
     return {
       rawText: original,
@@ -522,7 +522,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
   let mainPart = textToParse;
   let preparation = null;
 
-  const commaIndex = textToParse.indexOf(",");
+  const commaIndex = textToParse.indexOf(',');
   if (commaIndex > 0) {
     mainPart = textToParse.substring(0, commaIndex).trim();
     preparation = textToParse.substring(commaIndex + 1).trim();
@@ -532,9 +532,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
   const parenMatch = mainPart.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
   if (parenMatch) {
     mainPart = parenMatch[1].trim();
-    preparation = preparation
-      ? `${parenMatch[2]}, ${preparation}`
-      : parenMatch[2];
+    preparation = preparation ? `${parenMatch[2]}, ${preparation}` : parenMatch[2];
   }
 
   // Check for vague quantity phrases first (e.g., "a few cloves of garlic")
@@ -544,7 +542,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
 
   const lowerMainPart = mainPart.toLowerCase();
   for (const [phrase, value] of Object.entries(VAGUE_QUANTITIES)) {
-    if (lowerMainPart.startsWith(phrase + " ") || lowerMainPart === phrase) {
+    if (lowerMainPart.startsWith(phrase + ' ') || lowerMainPart === phrase) {
       quantity = value;
       remainingText = mainPart.substring(phrase.length).trim();
       vagueQuantityMatched = true;
@@ -580,22 +578,22 @@ function parseIngredientString(rawText, sortOrder = 0) {
     const normalizedUnit = normalizeUnit(words[0]);
     if (normalizedUnit) {
       unit = normalizedUnit;
-      ingredientName = words.slice(1).join(" ").trim();
+      ingredientName = words.slice(1).join(' ').trim();
     }
     // Special case: "fluid ounce" is two words
     else if (
       words.length > 1 &&
-      words[0].toLowerCase() === "fluid" &&
-      words[1].toLowerCase().startsWith("oz")
+      words[0].toLowerCase() === 'fluid' &&
+      words[1].toLowerCase().startsWith('oz')
     ) {
-      unit = "fl oz";
-      ingredientName = words.slice(2).join(" ").trim();
+      unit = 'fl oz';
+      ingredientName = words.slice(2).join(' ').trim();
     }
   }
 
   // Clean up ingredient name
   // Remove leading "of" (e.g., "cup of flour" → "flour")
-  if (ingredientName.toLowerCase().startsWith("of ")) {
+  if (ingredientName.toLowerCase().startsWith('of ')) {
     ingredientName = ingredientName.substring(3).trim();
   }
 
@@ -608,7 +606,7 @@ function parseIngredientString(rawText, sortOrder = 0) {
   if (quantity !== null && !unit) {
     const lowerIngredient = ingredientName.toLowerCase();
     if (COUNTABLE_INGREDIENTS.has(lowerIngredient)) {
-      unit = "piece";
+      unit = 'piece';
     }
   }
 
@@ -631,14 +629,14 @@ function parseIngredientString(rawText, sortOrder = 0) {
  */
 function formatIngredientDisplay(ingredient) {
   if (!ingredient) {
-    return "";
+    return '';
   }
 
   const { quantity, unit, ingredient: name, rawText } = ingredient;
 
   // If no parsed data, return raw text
   if (quantity === null && !unit && (!name || name === rawText)) {
-    return rawText || "";
+    return rawText || '';
   }
 
   const parts = [];
@@ -658,10 +656,10 @@ function formatIngredientDisplay(ingredient) {
     parts.push(name);
   } else if (!parts.length) {
     // Fallback to raw text if nothing else
-    return rawText || "";
+    return rawText || '';
   }
 
-  return parts.join(" ").trim();
+  return parts.join(' ').trim();
 }
 
 /**
@@ -672,7 +670,7 @@ function formatIngredientDisplay(ingredient) {
  */
 function formatQuantityDisplay(quantity) {
   if (quantity === null || quantity === undefined) {
-    return "";
+    return '';
   }
 
   const whole = Math.floor(quantity);
@@ -680,15 +678,15 @@ function formatQuantityDisplay(quantity) {
 
   // Common fractions with their Unicode equivalents
   const fractionMap = [
-    [0.125, "⅛"],
-    [0.25, "¼"],
-    [0.333, "⅓"],
-    [0.375, "⅜"],
-    [0.5, "½"],
-    [0.625, "⅝"],
-    [0.666, "⅔"],
-    [0.75, "¾"],
-    [0.875, "⅞"],
+    [0.125, '⅛'],
+    [0.25, '¼'],
+    [0.333, '⅓'],
+    [0.375, '⅜'],
+    [0.5, '½'],
+    [0.625, '⅝'],
+    [0.666, '⅔'],
+    [0.75, '¾'],
+    [0.875, '⅞'],
   ];
 
   // Find closest fraction
@@ -713,7 +711,7 @@ function formatQuantityDisplay(quantity) {
 
   // No close fraction match - format as decimal
   if (remainder > 0.01) {
-    return quantity.toFixed(2).replace(/\.?0+$/, "");
+    return quantity.toFixed(2).replace(/\.?0+$/, '');
   }
 
   return String(whole);
@@ -737,7 +735,7 @@ function toNumber(value) {
   if (value === null || value === undefined) {
     return null;
   }
-  const num = typeof value === "string" ? parseFloat(value) : Number(value);
+  const num = typeof value === 'string' ? parseFloat(value) : Number(value);
   return isNaN(num) ? null : num;
 }
 
