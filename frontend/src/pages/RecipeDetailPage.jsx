@@ -8,7 +8,13 @@ import Button from '../components/Button';
 import Input from '../components/Input';
 import ShoppingListSelectorModal from '../components/ShoppingListSelectorModal';
 import RecipeNotes from '../components/RecipeNotes';
-import { MinusIcon, PlusIcon, ShoppingCartIcon, PrinterIcon, PencilIcon } from '@heroicons/react/24/outline';
+import {
+  MinusIcon,
+  PlusIcon,
+  ShoppingCartIcon,
+  PrinterIcon,
+  PencilIcon,
+} from '@heroicons/react/24/outline';
 import { formatDuration } from '../utils/timeFormatter';
 
 export default function RecipeDetailPage() {
@@ -606,9 +612,7 @@ export default function RecipeDetailPage() {
             <div className="space-y-3">
               {editForm.instructions.map((instruction, index) => (
                 <div key={index} className="flex gap-2 items-start">
-                  <span className="text-gray-500 font-medium min-w-[24px] pt-3">
-                    {index + 1}.
-                  </span>
+                  <span className="text-gray-500 font-medium min-w-[24px] pt-3">{index + 1}.</span>
                   <textarea
                     value={instruction}
                     onChange={(e) => handleEditInstructionChange(index, e.target.value)}
@@ -643,7 +647,9 @@ export default function RecipeDetailPage() {
                     <button
                       key={cuisine.id}
                       type="button"
-                      onClick={() => toggleCategory(cuisine.id, selectedCuisines, setSelectedCuisines)}
+                      onClick={() =>
+                        toggleCategory(cuisine.id, selectedCuisines, setSelectedCuisines)
+                      }
                       className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                         selectedCuisines.includes(cuisine.id)
                           ? 'bg-orange-500 text-white'
@@ -665,7 +671,9 @@ export default function RecipeDetailPage() {
                     <button
                       key={mealType.id}
                       type="button"
-                      onClick={() => toggleCategory(mealType.id, selectedMealTypes, setSelectedMealTypes)}
+                      onClick={() =>
+                        toggleCategory(mealType.id, selectedMealTypes, setSelectedMealTypes)
+                      }
                       className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                         selectedMealTypes.includes(mealType.id)
                           ? 'bg-blue-500 text-white'
@@ -681,13 +689,17 @@ export default function RecipeDetailPage() {
 
             {availableDietaryLabels.length > 0 && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Dietary Labels</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Dietary Labels
+                </label>
                 <div className="flex flex-wrap gap-2">
                   {availableDietaryLabels.map((label) => (
                     <button
                       key={label.id}
                       type="button"
-                      onClick={() => toggleCategory(label.id, selectedDietaryLabels, setSelectedDietaryLabels)}
+                      onClick={() =>
+                        toggleCategory(label.id, selectedDietaryLabels, setSelectedDietaryLabels)
+                      }
                       className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                         selectedDietaryLabels.includes(label.id)
                           ? 'bg-green-500 text-white'
@@ -981,10 +993,7 @@ export default function RecipeDetailPage() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  onClick={handleSaveCategories}
-                  loading={savingCategories}
-                >
+                <Button onClick={handleSaveCategories} loading={savingCategories}>
                   Save
                 </Button>
               </div>
@@ -998,7 +1007,9 @@ export default function RecipeDetailPage() {
                   <button
                     key={cuisine.id}
                     type="button"
-                    onClick={() => toggleCategory(cuisine.id, selectedCuisines, setSelectedCuisines)}
+                    onClick={() =>
+                      toggleCategory(cuisine.id, selectedCuisines, setSelectedCuisines)
+                    }
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                       selectedCuisines.includes(cuisine.id)
                         ? 'bg-orange-500 text-white'
@@ -1019,7 +1030,9 @@ export default function RecipeDetailPage() {
                   <button
                     key={mealType.id}
                     type="button"
-                    onClick={() => toggleCategory(mealType.id, selectedMealTypes, setSelectedMealTypes)}
+                    onClick={() =>
+                      toggleCategory(mealType.id, selectedMealTypes, setSelectedMealTypes)
+                    }
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                       selectedMealTypes.includes(mealType.id)
                         ? 'bg-blue-500 text-white'
@@ -1040,7 +1053,9 @@ export default function RecipeDetailPage() {
                   <button
                     key={label.id}
                     type="button"
-                    onClick={() => toggleCategory(label.id, selectedDietaryLabels, setSelectedDietaryLabels)}
+                    onClick={() =>
+                      toggleCategory(label.id, selectedDietaryLabels, setSelectedDietaryLabels)
+                    }
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                       selectedDietaryLabels.includes(label.id)
                         ? 'bg-green-500 text-white'
@@ -1085,7 +1100,9 @@ export default function RecipeDetailPage() {
                 className="no-print inline-block text-gray-400 hover:text-gray-600 px-2 py-1 text-sm transition-colors"
                 title="Edit categories"
               >
-                {recipe.cuisines?.length > 0 || recipe.mealTypes?.length > 0 || recipe.dietaryLabels?.length > 0
+                {recipe.cuisines?.length > 0 ||
+                recipe.mealTypes?.length > 0 ||
+                recipe.dietaryLabels?.length > 0
                   ? 'Edit'
                   : '+ Add categories'}
               </button>
@@ -1102,7 +1119,8 @@ export default function RecipeDetailPage() {
               {(() => {
                 let lastGroup = null;
                 return recipe.ingredients.map((ingredient, index) => {
-                  const showGroupHeader = ingredient.ingredientGroup && ingredient.ingredientGroup !== lastGroup;
+                  const showGroupHeader =
+                    ingredient.ingredientGroup && ingredient.ingredientGroup !== lastGroup;
                   lastGroup = ingredient.ingredientGroup;
 
                   return (
@@ -1116,7 +1134,10 @@ export default function RecipeDetailPage() {
                         </div>
                       )}
                       <div className="flex items-start">
-                        <input type="checkbox" className="mt-1 mr-3 h-4 w-4 text-primary-600 rounded" />
+                        <input
+                          type="checkbox"
+                          className="mt-1 mr-3 h-4 w-4 text-primary-600 rounded"
+                        />
                         <span className="text-gray-700">{formatQuantity(ingredient)}</span>
                       </div>
                     </li>

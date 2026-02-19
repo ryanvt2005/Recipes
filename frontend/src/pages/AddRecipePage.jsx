@@ -522,7 +522,9 @@ export default function AddRecipePage() {
                         <div className="flex gap-2 items-start">
                           <Input
                             value={displayValue}
-                            onChange={(e) => handleIngredientChange(index, 'rawText', e.target.value)}
+                            onChange={(e) =>
+                              handleIngredientChange(index, 'rawText', e.target.value)
+                            }
                             placeholder="e.g., 2 cups flour"
                             className="flex-1 !mb-0"
                           />

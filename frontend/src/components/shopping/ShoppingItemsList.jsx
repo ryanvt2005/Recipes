@@ -100,9 +100,7 @@ export default function ShoppingItemsList({
                     <div
                       key={item.id}
                       className={`w-full rounded-lg border transition-colors text-left ${
-                        item.is_checked
-                          ? 'bg-gray-50 border-gray-200'
-                          : 'bg-white border-gray-300'
+                        item.is_checked ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-300'
                       }`}
                     >
                       {/* Main row: checkbox + item text (tappable) */}
