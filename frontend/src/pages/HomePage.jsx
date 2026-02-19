@@ -9,7 +9,9 @@ export default function HomePage() {
   return (
     <Layout>
       <div className="text-center py-16 sm:py-24">
-        <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">Welcome to Recipe Manager</h1>
+        <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
+          Welcome to Recipe Manager
+        </h1>
         <p className="text-lg text-gray-500 leading-relaxed mb-8 max-w-2xl mx-auto">
           Save recipes from any website, organize your collection, and never lose a recipe again.
           Powered by AI for smart recipe extraction.

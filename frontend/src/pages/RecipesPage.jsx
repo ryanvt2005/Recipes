@@ -61,7 +61,17 @@ export default function RecipesPage() {
   // Fetch recipes when filters change
   useEffect(() => {
     fetchRecipes();
-  }, [page, search, selectedTags, sortBy, sortOrder, maxCookTime, selectedCuisines, selectedMealTypes, selectedDietaryLabels]);
+  }, [
+    page,
+    search,
+    selectedTags,
+    sortBy,
+    sortOrder,
+    maxCookTime,
+    selectedCuisines,
+    selectedMealTypes,
+    selectedDietaryLabels,
+  ]);
 
   const fetchRecipes = async () => {
     try {
@@ -115,7 +125,9 @@ export default function RecipesPage() {
 
   const toggleDietaryLabel = (dietaryLabelId) => {
     setSelectedDietaryLabels((prev) =>
-      prev.includes(dietaryLabelId) ? prev.filter((d) => d !== dietaryLabelId) : [...prev, dietaryLabelId]
+      prev.includes(dietaryLabelId)
+        ? prev.filter((d) => d !== dietaryLabelId)
+        : [...prev, dietaryLabelId]
     );
     setPage(1);
   };
@@ -246,7 +258,12 @@ export default function RecipesPage() {
               <span className="hidden sm:inline">Filters</span>
               {hasActiveFilters && (
                 <span className="ml-1 bg-primary-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  {selectedTags.length + selectedCuisines.length + selectedMealTypes.length + selectedDietaryLabels.length + (maxCookTime ? 1 : 0) + (sortBy !== 'createdAt' ? 1 : 0)}
+                  {selectedTags.length +
+                    selectedCuisines.length +
+                    selectedMealTypes.length +
+                    selectedDietaryLabels.length +
+                    (maxCookTime ? 1 : 0) +
+                    (sortBy !== 'createdAt' ? 1 : 0)}
                 </span>
               )}
             </Button>
@@ -435,7 +452,10 @@ export default function RecipesPage() {
                     className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-100 text-orange-800"
                   >
                     {cuisine.name}
-                    <button onClick={() => toggleCuisine(cuisineId)} className="ml-1 hover:text-orange-600">
+                    <button
+                      onClick={() => toggleCuisine(cuisineId)}
+                      className="ml-1 hover:text-orange-600"
+                    >
                       ×
                     </button>
                   </span>
@@ -449,7 +469,10 @@ export default function RecipesPage() {
                     className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800"
                   >
                     {mealType.name}
-                    <button onClick={() => toggleMealType(mealTypeId)} className="ml-1 hover:text-blue-600">
+                    <button
+                      onClick={() => toggleMealType(mealTypeId)}
+                      className="ml-1 hover:text-blue-600"
+                    >
                       ×
                     </button>
                   </span>
@@ -463,7 +486,10 @@ export default function RecipesPage() {
                     className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800"
                   >
                     {dietary.name}
-                    <button onClick={() => toggleDietaryLabel(dietaryId)} className="ml-1 hover:text-green-600">
+                    <button
+                      onClick={() => toggleDietaryLabel(dietaryId)}
+                      className="ml-1 hover:text-green-600"
+                    >
                       ×
                     </button>
                   </span>
