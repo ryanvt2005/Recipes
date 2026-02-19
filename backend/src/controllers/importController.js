@@ -15,7 +15,9 @@ const { autoTagRecipe } = require("../utils/recipeAutoTagger");
  * @returns {string|null} Truncated string or null if input is falsy
  */
 function truncate(str, maxLen) {
-  if (!str) return null;
+  if (!str) {
+    return null;
+  }
   return str.length > maxLen ? str.substring(0, maxLen) : str;
 }
 
