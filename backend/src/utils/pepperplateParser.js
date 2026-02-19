@@ -136,7 +136,7 @@ function parsePepperplateRecipe(content) {
   }
 
   // Build description from source and notes
-  let descriptionParts = [];
+  const descriptionParts = [];
   if (recipe.description) {
     descriptionParts.push(recipe.description);
   }
@@ -172,7 +172,9 @@ function extractValue(line, prefix) {
  * @returns {string} Normalized title (lowercase, trimmed)
  */
 function normalizeTitle(title) {
-  if (!title) return '';
+  if (!title) {
+    return '';
+  }
   return title.toLowerCase().trim();
 }
 
