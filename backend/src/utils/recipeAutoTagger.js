@@ -1115,7 +1115,9 @@ const PROTEIN_KEYWORDS = [
 let categoryCache = null;
 
 async function loadCategoryCache(pool) {
-  if (categoryCache) return categoryCache;
+  if (categoryCache) {
+    return categoryCache;
+  }
 
   const [cuisines, mealTypes, dietaryLabels] = await Promise.all([
     pool.query("SELECT id, name FROM cuisines ORDER BY sort_order"),
