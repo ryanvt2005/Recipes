@@ -1,8 +1,12 @@
-const pool = require('../config/database');
-const { extractRecipe, RecipeExtractionError, normalizeUrl } = require('../services/recipeExtractionService');
-const logger = require('../config/logger');
-const { scaleRecipe } = require('../utils/recipeScaling');
-const { ErrorCodes, sendError, errors } = require('../utils/errorResponse');
+const pool = require("../config/database");
+const {
+  extractRecipe,
+  RecipeExtractionError,
+  normalizeUrl,
+} = require("../services/recipeExtractionService");
+const logger = require("../config/logger");
+const { scaleRecipe } = require("../utils/recipeScaling");
+const { ErrorCodes, sendError, errors } = require("../utils/errorResponse");
 
 /**
  * Get ingredients for multiple recipes (for preview before adding to shopping list)
@@ -13,7 +17,7 @@ async function getIngredientsForRecipes(req, res) {
 
   try {
     if (!recipeIds || !Array.isArray(recipeIds) || recipeIds.length === 0) {
-      return errors.badRequest(res, 'recipeIds array is required');
+      return errors.badRequest(res, "recipeIds array is required");
     }
 
     const result = await pool.query(
@@ -22,13 +26,20 @@ async function getIngredientsForRecipes(req, res) {
        INNER JOIN recipes r ON i.recipe_id = r.id
        WHERE r.id = ANY($1) AND r.user_id = $2
        ORDER BY r.title, i.sort_order`,
-      [recipeIds, userId]
+      [recipeIds, userId],
     );
 
     res.json({ ingredients: result.rows });
   } catch (error) {
-    logger.error('Error fetching ingredients for recipes', { error: error.message });
-    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch ingredients');
+    logger.error("Error fetching ingredients for recipes", {
+      error: error.message,
+    });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.FETCH_FAILED,
+      "Failed to fetch ingredients",
+    );
   }
 }
 
@@ -46,19 +57,23 @@ async function extractRecipeFromUrl(req, res) {
       `SELECT id, title, image_url, created_at
        FROM recipes
        WHERE user_id = $1 AND source_url = $2`,
-      [userId, normalizedUrl]
+      [userId, normalizedUrl],
     );
 
     if (existing.rows.length > 0) {
-      return sendError(res, 409, ErrorCodes.DUPLICATE_RECIPE,
-        'You already have this recipe saved', {
+      return sendError(
+        res,
+        409,
+        ErrorCodes.DUPLICATE_RECIPE,
+        "You already have this recipe saved",
+        {
           existingRecipe: {
             id: existing.rows[0].id,
             title: existing.rows[0].title,
             imageUrl: existing.rows[0].image_url,
-            createdAt: existing.rows[0].created_at
-          }
-        }
+            createdAt: existing.rows[0].created_at,
+          },
+        },
       );
     }
 
@@ -74,12 +89,12 @@ async function extractRecipeFromUrl(req, res) {
       });
     }
 
-    logger.error('Recipe extraction error', { error: error.message });
+    logger.error("Recipe extraction error", { error: error.message });
     return sendError(
       res,
       500,
       ErrorCodes.EXTRACTION_ERROR,
-      'An unexpected error occurred during extraction'
+      "An unexpected error occurred during extraction",
     );
   }
 }
@@ -110,7 +125,7 @@ async function saveRecipe(req, res) {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     // Insert recipe
     const recipeResult = await client.query(
@@ -128,8 +143,8 @@ async function saveRecipe(req, res) {
         prepTime || null,
         cookTime || null,
         totalTime || null,
-        extractionMethod || 'manual',
-      ]
+        extractionMethod || "manual",
+      ],
     );
 
     const recipe = recipeResult.rows[0];
@@ -150,7 +165,7 @@ async function saveRecipe(req, res) {
           ing.ingredient,
           ing.preparation || null,
           ing.group || null,
-        ]
+        ],
       );
     }
 
@@ -159,7 +174,7 @@ async function saveRecipe(req, res) {
       await client.query(
         `INSERT INTO instructions (recipe_id, step_number, instruction_text)
          VALUES ($1, $2, $3)`,
-        [recipe.id, i + 1, instructions[i]]
+        [recipe.id, i + 1, instructions[i]],
       );
     }
 
@@ -171,7 +186,7 @@ async function saveRecipe(req, res) {
           `INSERT INTO tags (name) VALUES ($1)
            ON CONFLICT (name) DO UPDATE SET name = $1
            RETURNING id`,
-          [tagName.toLowerCase()]
+          [tagName.toLowerCase()],
         );
 
         const tagId = tagResult.rows[0].id;
@@ -180,7 +195,7 @@ async function saveRecipe(req, res) {
         await client.query(
           `INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ($1, $2)
            ON CONFLICT DO NOTHING`,
-          [recipe.id, tagId]
+          [recipe.id, tagId],
         );
       }
     }
@@ -191,7 +206,7 @@ async function saveRecipe(req, res) {
         await client.query(
           `INSERT INTO recipe_cuisines (recipe_id, cuisine_id) VALUES ($1, $2)
            ON CONFLICT DO NOTHING`,
-          [recipe.id, cuisineId]
+          [recipe.id, cuisineId],
         );
       }
     }
@@ -202,7 +217,7 @@ async function saveRecipe(req, res) {
         await client.query(
           `INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)
            ON CONFLICT DO NOTHING`,
-          [recipe.id, mealTypeId]
+          [recipe.id, mealTypeId],
         );
       }
     }
@@ -213,23 +228,23 @@ async function saveRecipe(req, res) {
         await client.query(
           `INSERT INTO recipe_dietary_labels (recipe_id, dietary_label_id) VALUES ($1, $2)
            ON CONFLICT DO NOTHING`,
-          [recipe.id, dietaryLabelId]
+          [recipe.id, dietaryLabelId],
         );
       }
     }
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     // Fetch complete recipe with relationships
     const completeRecipe = await getRecipeById(recipe.id, userId);
 
-    logger.info('Recipe saved', { recipeId: recipe.id, userId });
+    logger.info("Recipe saved", { recipeId: recipe.id, userId });
 
     res.status(201).json({ recipe: completeRecipe });
   } catch (error) {
-    await client.query('ROLLBACK');
-    logger.error('Save recipe error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.SAVE_FAILED, 'Failed to save recipe');
+    await client.query("ROLLBACK");
+    logger.error("Save recipe error", { error: error.message });
+    return sendError(res, 500, ErrorCodes.SAVE_FAILED, "Failed to save recipe");
   } finally {
     client.release();
   }
@@ -243,19 +258,27 @@ async function getRecipes(req, res) {
   const {
     page = 1,
     limit = 20,
-    search = '',
-    tags = '',
-    sortBy = 'createdAt',
-    sortOrder = 'desc',
-    maxCookTime = '',
-    cuisines = '',
-    mealTypes = '',
-    dietaryLabels = '',
+    search = "",
+    tags = "",
+    sortBy = "createdAt",
+    sortOrder = "desc",
+    maxCookTime = "",
+    cuisines = "",
+    mealTypes = "",
+    dietaryLabels = "",
   } = req.query;
 
   const offset = (parseInt(page) - 1) * parseInt(limit);
-  const validSortBy = ['createdAt', 'title', 'updatedAt', 'cookTime', 'totalTime'].includes(sortBy) ? sortBy : 'createdAt';
-  const validSortOrder = sortOrder === 'asc' ? 'ASC' : 'DESC';
+  const validSortBy = [
+    "createdAt",
+    "title",
+    "updatedAt",
+    "cookTime",
+    "totalTime",
+  ].includes(sortBy)
+    ? sortBy
+    : "createdAt";
+  const validSortOrder = sortOrder === "asc" ? "ASC" : "DESC";
 
   try {
     let query = `
@@ -277,7 +300,7 @@ async function getRecipes(req, res) {
 
     // Add tags filter
     if (tags) {
-      const tagArray = tags.split(',').map((t) => t.trim().toLowerCase());
+      const tagArray = tags.split(",").map((t) => t.trim().toLowerCase());
       paramCount++;
       query += ` AND EXISTS (
         SELECT 1 FROM recipe_tags rt
@@ -317,7 +340,7 @@ async function getRecipes(req, res) {
 
     // Add cuisines filter
     if (cuisines) {
-      const cuisineArray = cuisines.split(',').map((c) => c.trim());
+      const cuisineArray = cuisines.split(",").map((c) => c.trim());
       paramCount++;
       query += ` AND EXISTS (
         SELECT 1 FROM recipe_cuisines rc
@@ -328,7 +351,7 @@ async function getRecipes(req, res) {
 
     // Add meal types filter
     if (mealTypes) {
-      const mealTypeArray = mealTypes.split(',').map((m) => m.trim());
+      const mealTypeArray = mealTypes.split(",").map((m) => m.trim());
       paramCount++;
       query += ` AND EXISTS (
         SELECT 1 FROM recipe_meal_types rm
@@ -339,7 +362,7 @@ async function getRecipes(req, res) {
 
     // Add dietary labels filter
     if (dietaryLabels) {
-      const dietaryLabelArray = dietaryLabels.split(',').map((d) => d.trim());
+      const dietaryLabelArray = dietaryLabels.split(",").map((d) => d.trim());
       paramCount++;
       query += ` AND EXISTS (
         SELECT 1 FROM recipe_dietary_labels rd
@@ -351,24 +374,24 @@ async function getRecipes(req, res) {
     // Get total count
     const countResult = await pool.query(
       query.replace(
-        'SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.cook_time, r.total_time, r.created_at',
-        'SELECT COUNT(DISTINCT r.id)'
+        "SELECT DISTINCT r.id, r.title, r.description, r.image_url, r.servings, r.cook_time, r.total_time, r.created_at",
+        "SELECT COUNT(DISTINCT r.id)",
       ),
-      params
+      params,
     );
     const total = parseInt(countResult.rows[0].count);
 
     // Add sorting and pagination
     const sortColumn =
-      validSortBy === 'createdAt'
-        ? 'r.created_at'
-        : validSortBy === 'updatedAt'
-          ? 'r.updated_at'
-          : validSortBy === 'cookTime'
-            ? 'r.cook_time'
-            : validSortBy === 'totalTime'
-              ? 'r.total_time'
-              : 'r.title';
+      validSortBy === "createdAt"
+        ? "r.created_at"
+        : validSortBy === "updatedAt"
+          ? "r.updated_at"
+          : validSortBy === "cookTime"
+            ? "r.cook_time"
+            : validSortBy === "totalTime"
+              ? "r.total_time"
+              : "r.title";
     query += ` ORDER BY ${sortColumn} ${validSortOrder}`;
     query += ` LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
     params.push(parseInt(limit), offset);
@@ -383,7 +406,7 @@ async function getRecipes(req, res) {
           `SELECT t.name FROM tags t
          JOIN recipe_tags rt ON t.id = rt.tag_id
          WHERE rt.recipe_id = $1`,
-          [recipe.id]
+          [recipe.id],
         );
 
         return {
@@ -397,7 +420,7 @@ async function getRecipes(req, res) {
           tags: tagsResult.rows.map((t) => t.name),
           createdAt: recipe.created_at,
         };
-      })
+      }),
     );
 
     res.status(200).json({
@@ -410,8 +433,13 @@ async function getRecipes(req, res) {
       },
     });
   } catch (error) {
-    logger.error('Get recipes error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch recipes');
+    logger.error("Get recipes error", { error: error.message });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.FETCH_FAILED,
+      "Failed to fetch recipes",
+    );
   }
 }
 
@@ -426,13 +454,18 @@ async function getRecipe(req, res) {
     const recipe = await getRecipeById(recipeId, userId);
 
     if (!recipe) {
-      return errors.notFound(res, 'Recipe not found');
+      return errors.notFound(res, "Recipe not found");
     }
 
     res.status(200).json({ recipe });
   } catch (error) {
-    logger.error('Get recipe error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch recipe');
+    logger.error("Get recipe error", { error: error.message });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.FETCH_FAILED,
+      "Failed to fetch recipe",
+    );
   }
 }
 
@@ -441,10 +474,10 @@ async function getRecipe(req, res) {
  */
 async function getRecipeById(recipeId, userId) {
   // Get recipe
-  const recipeResult = await pool.query(`SELECT * FROM recipes WHERE id = $1 AND user_id = $2`, [
-    recipeId,
-    userId,
-  ]);
+  const recipeResult = await pool.query(
+    `SELECT * FROM recipes WHERE id = $1 AND user_id = $2`,
+    [recipeId, userId],
+  );
 
   if (recipeResult.rows.length === 0) {
     return null;
@@ -455,13 +488,13 @@ async function getRecipeById(recipeId, userId) {
   // Get ingredients
   const ingredientsResult = await pool.query(
     `SELECT * FROM ingredients WHERE recipe_id = $1 ORDER BY sort_order`,
-    [recipeId]
+    [recipeId],
   );
 
   // Get instructions
   const instructionsResult = await pool.query(
     `SELECT * FROM instructions WHERE recipe_id = $1 ORDER BY step_number`,
-    [recipeId]
+    [recipeId],
   );
 
   // Get tags
@@ -469,7 +502,7 @@ async function getRecipeById(recipeId, userId) {
     `SELECT t.id, t.name FROM tags t
      JOIN recipe_tags rt ON t.id = rt.tag_id
      WHERE rt.recipe_id = $1`,
-    [recipeId]
+    [recipeId],
   );
 
   // Get cuisines
@@ -477,7 +510,7 @@ async function getRecipeById(recipeId, userId) {
     `SELECT c.id, c.name FROM cuisines c
      JOIN recipe_cuisines rc ON c.id = rc.cuisine_id
      WHERE rc.recipe_id = $1`,
-    [recipeId]
+    [recipeId],
   );
 
   // Get meal types
@@ -485,7 +518,7 @@ async function getRecipeById(recipeId, userId) {
     `SELECT m.id, m.name FROM meal_types m
      JOIN recipe_meal_types rm ON m.id = rm.meal_type_id
      WHERE rm.recipe_id = $1`,
-    [recipeId]
+    [recipeId],
   );
 
   // Get dietary labels
@@ -493,7 +526,7 @@ async function getRecipeById(recipeId, userId) {
     `SELECT d.id, d.name FROM dietary_labels d
      JOIN recipe_dietary_labels rd ON d.id = rd.dietary_label_id
      WHERE rd.recipe_id = $1`,
-    [recipeId]
+    [recipeId],
   );
 
   return {
@@ -558,17 +591,17 @@ async function updateRecipe(req, res) {
   const client = await pool.connect();
 
   try {
-    await client.query('BEGIN');
+    await client.query("BEGIN");
 
     // Check if recipe exists and belongs to user
     const existingRecipe = await client.query(
-      'SELECT id FROM recipes WHERE id = $1 AND user_id = $2',
-      [recipeId, userId]
+      "SELECT id FROM recipes WHERE id = $1 AND user_id = $2",
+      [recipeId, userId],
     );
 
     if (existingRecipe.rows.length === 0) {
-      await client.query('ROLLBACK');
-      return errors.notFound(res, 'Recipe not found');
+      await client.query("ROLLBACK");
+      return errors.notFound(res, "Recipe not found");
     }
 
     // Update recipe
@@ -612,15 +645,17 @@ async function updateRecipe(req, res) {
     if (updates.length > 0) {
       values.push(recipeId);
       await client.query(
-        `UPDATE recipes SET ${updates.join(', ')} WHERE id = $${paramCount}`,
-        values
+        `UPDATE recipes SET ${updates.join(", ")} WHERE id = $${paramCount}`,
+        values,
       );
     }
 
     // Update ingredients if provided
     if (ingredients) {
       // Delete existing ingredients
-      await client.query('DELETE FROM ingredients WHERE recipe_id = $1', [recipeId]);
+      await client.query("DELETE FROM ingredients WHERE recipe_id = $1", [
+        recipeId,
+      ]);
 
       // Insert new ingredients
       for (let i = 0; i < ingredients.length; i++) {
@@ -638,7 +673,7 @@ async function updateRecipe(req, res) {
             ing.ingredient,
             ing.preparation || null,
             ing.group || null,
-          ]
+          ],
         );
       }
     }
@@ -646,14 +681,16 @@ async function updateRecipe(req, res) {
     // Update instructions if provided
     if (instructions) {
       // Delete existing instructions
-      await client.query('DELETE FROM instructions WHERE recipe_id = $1', [recipeId]);
+      await client.query("DELETE FROM instructions WHERE recipe_id = $1", [
+        recipeId,
+      ]);
 
       // Insert new instructions
       for (let i = 0; i < instructions.length; i++) {
         await client.query(
           `INSERT INTO instructions (recipe_id, step_number, instruction_text)
            VALUES ($1, $2, $3)`,
-          [recipeId, i + 1, instructions[i]]
+          [recipeId, i + 1, instructions[i]],
         );
       }
     }
@@ -661,7 +698,9 @@ async function updateRecipe(req, res) {
     // Update tags if provided
     if (tags) {
       // Delete existing tag associations
-      await client.query('DELETE FROM recipe_tags WHERE recipe_id = $1', [recipeId]);
+      await client.query("DELETE FROM recipe_tags WHERE recipe_id = $1", [
+        recipeId,
+      ]);
 
       // Insert new tags
       for (const tagName of tags) {
@@ -669,63 +708,75 @@ async function updateRecipe(req, res) {
           `INSERT INTO tags (name) VALUES ($1)
            ON CONFLICT (name) DO UPDATE SET name = $1
            RETURNING id`,
-          [tagName.toLowerCase()]
+          [tagName.toLowerCase()],
         );
 
         const tagId = tagResult.rows[0].id;
 
-        await client.query(`INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ($1, $2)`, [
-          recipeId,
-          tagId,
-        ]);
+        await client.query(
+          `INSERT INTO recipe_tags (recipe_id, tag_id) VALUES ($1, $2)`,
+          [recipeId, tagId],
+        );
       }
     }
 
     // Update cuisines if provided
     if (cuisines) {
-      await client.query('DELETE FROM recipe_cuisines WHERE recipe_id = $1', [recipeId]);
+      await client.query("DELETE FROM recipe_cuisines WHERE recipe_id = $1", [
+        recipeId,
+      ]);
       for (const cuisineId of cuisines) {
         await client.query(
           `INSERT INTO recipe_cuisines (recipe_id, cuisine_id) VALUES ($1, $2)`,
-          [recipeId, cuisineId]
+          [recipeId, cuisineId],
         );
       }
     }
 
     // Update meal types if provided
     if (mealTypes) {
-      await client.query('DELETE FROM recipe_meal_types WHERE recipe_id = $1', [recipeId]);
+      await client.query("DELETE FROM recipe_meal_types WHERE recipe_id = $1", [
+        recipeId,
+      ]);
       for (const mealTypeId of mealTypes) {
         await client.query(
           `INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)`,
-          [recipeId, mealTypeId]
+          [recipeId, mealTypeId],
         );
       }
     }
 
     // Update dietary labels if provided
     if (dietaryLabels) {
-      await client.query('DELETE FROM recipe_dietary_labels WHERE recipe_id = $1', [recipeId]);
+      await client.query(
+        "DELETE FROM recipe_dietary_labels WHERE recipe_id = $1",
+        [recipeId],
+      );
       for (const dietaryLabelId of dietaryLabels) {
         await client.query(
           `INSERT INTO recipe_dietary_labels (recipe_id, dietary_label_id) VALUES ($1, $2)`,
-          [recipeId, dietaryLabelId]
+          [recipeId, dietaryLabelId],
         );
       }
     }
 
-    await client.query('COMMIT');
+    await client.query("COMMIT");
 
     // Fetch updated recipe
     const updatedRecipe = await getRecipeById(recipeId, userId);
 
-    logger.info('Recipe updated', { recipeId, userId });
+    logger.info("Recipe updated", { recipeId, userId });
 
     res.status(200).json({ recipe: updatedRecipe });
   } catch (error) {
-    await client.query('ROLLBACK');
-    logger.error('Update recipe error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.UPDATE_FAILED, 'Failed to update recipe');
+    await client.query("ROLLBACK");
+    logger.error("Update recipe error", { error: error.message });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.UPDATE_FAILED,
+      "Failed to update recipe",
+    );
   } finally {
     client.release();
   }
@@ -746,7 +797,7 @@ async function getScaledRecipe(req, res) {
         res,
         400,
         ErrorCodes.INVALID_SERVINGS,
-        'Target servings must be a positive number'
+        "Target servings must be a positive number",
       );
     }
 
@@ -754,7 +805,7 @@ async function getScaledRecipe(req, res) {
     const recipe = await getRecipeById(recipeId, userId);
 
     if (!recipe) {
-      return errors.notFound(res, 'Recipe not found');
+      return errors.notFound(res, "Recipe not found");
     }
 
     // Scale the recipe
@@ -762,8 +813,13 @@ async function getScaledRecipe(req, res) {
 
     res.status(200).json({ recipe: scaledRecipe });
   } catch (error) {
-    logger.error('Scale recipe error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.SCALE_FAILED, 'Failed to scale recipe');
+    logger.error("Scale recipe error", { error: error.message });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.SCALE_FAILED,
+      "Failed to scale recipe",
+    );
   }
 }
 
@@ -776,20 +832,25 @@ async function deleteRecipe(req, res) {
 
   try {
     const result = await pool.query(
-      'DELETE FROM recipes WHERE id = $1 AND user_id = $2 RETURNING id',
-      [recipeId, userId]
+      "DELETE FROM recipes WHERE id = $1 AND user_id = $2 RETURNING id",
+      [recipeId, userId],
     );
 
     if (result.rows.length === 0) {
-      return errors.notFound(res, 'Recipe not found');
+      return errors.notFound(res, "Recipe not found");
     }
 
-    logger.info('Recipe deleted', { recipeId, userId });
+    logger.info("Recipe deleted", { recipeId, userId });
 
     res.status(204).send();
   } catch (error) {
-    logger.error('Delete recipe error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.DELETE_FAILED, 'Failed to delete recipe');
+    logger.error("Delete recipe error", { error: error.message });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.DELETE_FAILED,
+      "Failed to delete recipe",
+    );
   }
 }
 
@@ -808,13 +869,13 @@ async function getUserTags(req, res) {
        WHERE r.user_id = $1
        GROUP BY t.id, t.name
        ORDER BY t.name`,
-      [userId]
+      [userId],
     );
 
     res.status(200).json({ tags: result.rows });
   } catch (error) {
-    logger.error('Get user tags error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch tags');
+    logger.error("Get user tags error", { error: error.message });
+    return sendError(res, 500, ErrorCodes.FETCH_FAILED, "Failed to fetch tags");
   }
 }
 
@@ -824,12 +885,17 @@ async function getUserTags(req, res) {
 async function getCuisines(req, res) {
   try {
     const result = await pool.query(
-      `SELECT id, name FROM cuisines ORDER BY sort_order, name`
+      `SELECT id, name FROM cuisines ORDER BY sort_order, name`,
     );
     res.status(200).json({ cuisines: result.rows });
   } catch (error) {
-    logger.error('Get cuisines error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch cuisines');
+    logger.error("Get cuisines error", { error: error.message });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.FETCH_FAILED,
+      "Failed to fetch cuisines",
+    );
   }
 }
 
@@ -839,12 +905,17 @@ async function getCuisines(req, res) {
 async function getMealTypes(req, res) {
   try {
     const result = await pool.query(
-      `SELECT id, name FROM meal_types ORDER BY sort_order, name`
+      `SELECT id, name FROM meal_types ORDER BY sort_order, name`,
     );
     res.status(200).json({ mealTypes: result.rows });
   } catch (error) {
-    logger.error('Get meal types error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch meal types');
+    logger.error("Get meal types error", { error: error.message });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.FETCH_FAILED,
+      "Failed to fetch meal types",
+    );
   }
 }
 
@@ -854,12 +925,17 @@ async function getMealTypes(req, res) {
 async function getDietaryLabels(req, res) {
   try {
     const result = await pool.query(
-      `SELECT id, name FROM dietary_labels ORDER BY sort_order, name`
+      `SELECT id, name FROM dietary_labels ORDER BY sort_order, name`,
     );
     res.status(200).json({ dietaryLabels: result.rows });
   } catch (error) {
-    logger.error('Get dietary labels error', { error: error.message });
-    return sendError(res, 500, ErrorCodes.FETCH_FAILED, 'Failed to fetch dietary labels');
+    logger.error("Get dietary labels error", { error: error.message });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.FETCH_FAILED,
+      "Failed to fetch dietary labels",
+    );
   }
 }
 

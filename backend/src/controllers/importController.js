@@ -1,9 +1,12 @@
-const AdmZip = require('adm-zip');
-const pool = require('../config/database');
-const logger = require('../config/logger');
-const { parsePepperplateRecipe, normalizeTitle } = require('../utils/pepperplateParser');
-const { ErrorCodes, sendError, errors } = require('../utils/errorResponse');
-const { autoTagRecipe } = require('../utils/recipeAutoTagger');
+const AdmZip = require("adm-zip");
+const pool = require("../config/database");
+const logger = require("../config/logger");
+const {
+  parsePepperplateRecipe,
+  normalizeTitle,
+} = require("../utils/pepperplateParser");
+const { ErrorCodes, sendError, errors } = require("../utils/errorResponse");
+const { autoTagRecipe } = require("../utils/recipeAutoTagger");
 
 /**
  * Truncate a string to a maximum length
@@ -12,9 +15,7 @@ const { autoTagRecipe } = require('../utils/recipeAutoTagger');
  * @returns {string|null} Truncated string or null if input is falsy
  */
 function truncate(str, maxLen) {
-  if (!str) {
-    return null;
-  }
+  if (!str) return null;
   return str.length > maxLen ? str.substring(0, maxLen) : str;
 }
 
@@ -26,7 +27,7 @@ async function importFromPepperplate(req, res) {
   const userId = req.user.userId;
 
   if (!req.file) {
-    return errors.badRequest(res, 'No file uploaded');
+    return errors.badRequest(res, "No file uploaded");
   }
 
   const results = {
@@ -43,12 +44,12 @@ async function importFromPepperplate(req, res) {
 
     // Filter to only .txt files
     const recipeFiles = entries.filter(
-      (entry) => !entry.isDirectory && entry.entryName.endsWith('.txt')
+      (entry) => !entry.isDirectory && entry.entryName.endsWith(".txt"),
     );
 
     results.total = recipeFiles.length;
 
-    logger.info('Starting Pepperplate import', {
+    logger.info("Starting Pepperplate import", {
       userId,
       totalFiles: results.total,
     });
@@ -56,9 +57,11 @@ async function importFromPepperplate(req, res) {
     // Get existing recipe titles for duplicate detection
     const existingResult = await pool.query(
       `SELECT LOWER(TRIM(title)) as normalized_title FROM recipes WHERE user_id = $1`,
-      [userId]
+      [userId],
     );
-    const existingTitles = new Set(existingResult.rows.map((r) => r.normalized_title));
+    const existingTitles = new Set(
+      existingResult.rows.map((r) => r.normalized_title),
+    );
 
     // Process each recipe individually for resilience
     for (const entry of recipeFiles) {
@@ -66,13 +69,13 @@ async function importFromPepperplate(req, res) {
 
       try {
         // Extract and parse the recipe
-        const content = entry.getData().toString('utf8');
+        const content = entry.getData().toString("utf8");
         const recipe = parsePepperplateRecipe(content);
 
         if (!recipe || !recipe.title) {
           results.errors.push({
             filename,
-            error: 'Failed to parse recipe - no title found',
+            error: "Failed to parse recipe - no title found",
           });
           continue;
         }
@@ -83,7 +86,7 @@ async function importFromPepperplate(req, res) {
           results.skipped.push({
             filename,
             title: recipe.title,
-            reason: 'duplicate',
+            reason: "duplicate",
           });
           continue;
         }
@@ -91,7 +94,7 @@ async function importFromPepperplate(req, res) {
         // Use a separate client for each recipe transaction
         const client = await pool.connect();
         try {
-          await client.query('BEGIN');
+          await client.query("BEGIN");
 
           // Insert recipe (truncate VARCHAR fields to fit database constraints)
           const recipeResult = await client.query(
@@ -110,7 +113,7 @@ async function importFromPepperplate(req, res) {
               truncate(recipe.cookTime, 50),
               truncate(recipe.totalTime, 50),
               recipe.extractionMethod,
-            ]
+            ],
           );
 
           const recipeId = recipeResult.rows[0].id;
@@ -118,9 +121,12 @@ async function importFromPepperplate(req, res) {
           // Insert ingredients (skip empty ones)
           for (const ing of recipe.ingredients) {
             // Ensure we have a valid ingredient name
-            let ingredientName = ing.ingredient?.trim() || ing.rawText?.trim() || 'Unknown ingredient';
+            let ingredientName =
+              ing.ingredient?.trim() ||
+              ing.rawText?.trim() ||
+              "Unknown ingredient";
 
-            if (!ingredientName || ingredientName === '') {
+            if (!ingredientName || ingredientName === "") {
               continue; // Skip completely empty ingredients
             }
 
@@ -143,7 +149,7 @@ async function importFromPepperplate(req, res) {
                 ingredientName,
                 preparation,
                 ingredientGroup,
-              ]
+              ],
             );
           }
 
@@ -154,7 +160,7 @@ async function importFromPepperplate(req, res) {
             await client.query(
               `INSERT INTO recipe_cuisines (recipe_id, cuisine_id) VALUES ($1, $2)
                ON CONFLICT DO NOTHING`,
-              [recipeId, cuisineId]
+              [recipeId, cuisineId],
             );
           }
 
@@ -162,7 +168,7 @@ async function importFromPepperplate(req, res) {
             await client.query(
               `INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)
                ON CONFLICT DO NOTHING`,
-              [recipeId, mealTypeId]
+              [recipeId, mealTypeId],
             );
           }
 
@@ -170,7 +176,7 @@ async function importFromPepperplate(req, res) {
             await client.query(
               `INSERT INTO recipe_dietary_labels (recipe_id, dietary_label_id) VALUES ($1, $2)
                ON CONFLICT DO NOTHING`,
-              [recipeId, dietaryLabelId]
+              [recipeId, dietaryLabelId],
             );
           }
 
@@ -181,7 +187,7 @@ async function importFromPepperplate(req, res) {
               await client.query(
                 `INSERT INTO instructions (recipe_id, step_number, instruction_text)
                  VALUES ($1, $2, $3)`,
-                [recipeId, stepNumber++, instruction.trim()]
+                [recipeId, stepNumber++, instruction.trim()],
               );
             }
           }
@@ -190,18 +196,18 @@ async function importFromPepperplate(req, res) {
           if (recipe.notes) {
             await client.query(
               `INSERT INTO recipe_notes (recipe_id, user_id, note_text) VALUES ($1, $2, $3)`,
-              [recipeId, userId, recipe.notes]
+              [recipeId, userId, recipe.notes],
             );
           }
 
-          await client.query('COMMIT');
+          await client.query("COMMIT");
 
           // Add to existing titles to prevent duplicates within the same import
           existingTitles.add(normalizedTitle);
           results.imported++;
         } catch (dbError) {
-          await client.query('ROLLBACK');
-          logger.warn('Failed to import recipe', {
+          await client.query("ROLLBACK");
+          logger.warn("Failed to import recipe", {
             filename,
             title: recipe.title,
             error: dbError.message,
@@ -215,18 +221,18 @@ async function importFromPepperplate(req, res) {
           client.release();
         }
       } catch (parseError) {
-        logger.warn('Failed to parse recipe file', {
+        logger.warn("Failed to parse recipe file", {
           filename,
           error: parseError.message,
         });
         results.errors.push({
           filename,
-          error: 'Parse error: ' + parseError.message,
+          error: "Parse error: " + parseError.message,
         });
       }
     }
 
-    logger.info('Pepperplate import completed', {
+    logger.info("Pepperplate import completed", {
       userId,
       imported: results.imported,
       skipped: results.skipped.length,
@@ -238,8 +244,16 @@ async function importFromPepperplate(req, res) {
       results,
     });
   } catch (error) {
-    logger.error('Pepperplate import error', { error: error.message, stack: error.stack });
-    return sendError(res, 500, ErrorCodes.IMPORT_FAILED, 'Failed to import recipes: ' + error.message);
+    logger.error("Pepperplate import error", {
+      error: error.message,
+      stack: error.stack,
+    });
+    return sendError(
+      res,
+      500,
+      ErrorCodes.IMPORT_FAILED,
+      "Failed to import recipes: " + error.message,
+    );
   }
 }
 
