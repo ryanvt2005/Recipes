@@ -1,7 +1,7 @@
-const pool = require("../config/database");
-const logger = require("../config/logger");
-const { autoTagRecipe } = require("../utils/recipeAutoTagger");
-const { ErrorCodes, sendError } = require("../utils/errorResponse");
+const pool = require('../config/database');
+const logger = require('../config/logger');
+const { autoTagRecipe } = require('../utils/recipeAutoTagger');
+const { ErrorCodes, sendError } = require('../utils/errorResponse');
 
 /**
  * Batch auto-tag recipes with cuisines, meal types, and dietary labels
@@ -32,7 +32,7 @@ async function batchAutoTag(req, res) {
     const recipesResult = await pool.query(query, params);
     const recipeRows = recipesResult.rows;
 
-    logger.info("Starting batch auto-tag", {
+    logger.info('Starting batch auto-tag', {
       userId,
       totalRecipes: recipeRows.length,
       force,
@@ -47,7 +47,7 @@ async function batchAutoTag(req, res) {
         // Fetch ingredients for this recipe
         const ingredientsResult = await client.query(
           `SELECT ingredient_name, raw_text FROM ingredients WHERE recipe_id = $1`,
-          [row.id],
+          [row.id]
         );
 
         const recipe = {
@@ -70,29 +70,20 @@ async function batchAutoTag(req, res) {
           continue;
         }
 
-        await client.query("BEGIN");
+        await client.query('BEGIN');
 
         // Clear existing tags if force mode
         if (force) {
-          await client.query(
-            "DELETE FROM recipe_cuisines WHERE recipe_id = $1",
-            [row.id],
-          );
-          await client.query(
-            "DELETE FROM recipe_meal_types WHERE recipe_id = $1",
-            [row.id],
-          );
-          await client.query(
-            "DELETE FROM recipe_dietary_labels WHERE recipe_id = $1",
-            [row.id],
-          );
+          await client.query('DELETE FROM recipe_cuisines WHERE recipe_id = $1', [row.id]);
+          await client.query('DELETE FROM recipe_meal_types WHERE recipe_id = $1', [row.id]);
+          await client.query('DELETE FROM recipe_dietary_labels WHERE recipe_id = $1', [row.id]);
         }
 
         for (const cuisineId of tags.cuisineIds) {
           await client.query(
             `INSERT INTO recipe_cuisines (recipe_id, cuisine_id) VALUES ($1, $2)
              ON CONFLICT DO NOTHING`,
-            [row.id, cuisineId],
+            [row.id, cuisineId]
           );
         }
 
@@ -100,7 +91,7 @@ async function batchAutoTag(req, res) {
           await client.query(
             `INSERT INTO recipe_meal_types (recipe_id, meal_type_id) VALUES ($1, $2)
              ON CONFLICT DO NOTHING`,
-            [row.id, mealTypeId],
+            [row.id, mealTypeId]
           );
         }
 
@@ -108,15 +99,15 @@ async function batchAutoTag(req, res) {
           await client.query(
             `INSERT INTO recipe_dietary_labels (recipe_id, dietary_label_id) VALUES ($1, $2)
              ON CONFLICT DO NOTHING`,
-            [row.id, dietaryLabelId],
+            [row.id, dietaryLabelId]
           );
         }
 
-        await client.query("COMMIT");
+        await client.query('COMMIT');
         tagged++;
       } catch (error) {
-        await client.query("ROLLBACK");
-        logger.warn("Failed to auto-tag recipe", {
+        await client.query('ROLLBACK');
+        logger.warn('Failed to auto-tag recipe', {
           recipeId: row.id,
           title: row.title,
           error: error.message,
@@ -131,7 +122,7 @@ async function batchAutoTag(req, res) {
       }
     }
 
-    logger.info("Batch auto-tag completed", {
+    logger.info('Batch auto-tag completed', {
       userId,
       tagged,
       total: recipeRows.length,
@@ -145,7 +136,7 @@ async function batchAutoTag(req, res) {
       errors,
     });
   } catch (error) {
-    logger.error("Batch auto-tag error", {
+    logger.error('Batch auto-tag error', {
       error: error.message,
       stack: error.stack,
     });
@@ -153,7 +144,7 @@ async function batchAutoTag(req, res) {
       res,
       500,
       ErrorCodes.IMPORT_FAILED,
-      "Failed to batch tag recipes: " + error.message,
+      'Failed to batch tag recipes: ' + error.message
     );
   }
 }
