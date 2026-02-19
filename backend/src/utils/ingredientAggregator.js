@@ -23,7 +23,9 @@ const { normalizeUnit, parseIngredientString, UNIT_MAP } = require('./ingredient
  * @returns {number} Edit distance
  */
 function levenshteinDistance(a, b) {
-  if (!a || !b) return (a || b || '').length;
+  if (!a || !b) {
+    return (a || b || '').length;
+  }
 
   const matrix = [];
 
@@ -116,7 +118,6 @@ const COMMON_MISSPELLINGS = {
   lettuse: 'lettuce',
   mushrom: 'mushroom',
   mushroon: 'mushroom',
-  mushrom: 'mushroom',
   avacado: 'avocado',
   avacodo: 'avocado',
   avocodo: 'avocado',
@@ -139,7 +140,6 @@ const COMMON_MISSPELLINGS = {
   basle: 'basil',
   basill: 'basil',
   basal: 'basil',
-  oregeno: 'oregano',
   oregeno: 'oregano',
   origano: 'oregano',
   tyme: 'thyme',
@@ -205,7 +205,6 @@ const COMMON_MISSPELLINGS = {
   suggar: 'sugar',
   vinager: 'vinegar',
   vinigar: 'vinegar',
-  vinager: 'vinegar',
   vineger: 'vinegar',
   mayonaise: 'mayonnaise',
   mayonase: 'mayonnaise',
@@ -255,7 +254,6 @@ const COMMON_MISSPELLINGS = {
   macaronni: 'macaroni',
   macroni: 'macaroni',
   lasanga: 'lasagna',
-  lasanga: 'lasagna',
   lazagna: 'lasagna',
   lasagne: 'lasagna',
   rice: 'rice',
@@ -276,7 +274,9 @@ const COMMON_MISSPELLINGS = {
  * @returns {{ corrected: string, wasCorrected: boolean, original?: string }}
  */
 function correctMisspelling(text) {
-  if (!text) return { corrected: text, wasCorrected: false };
+  if (!text) {
+    return { corrected: text, wasCorrected: false };
+  }
 
   const words = text.split(/\s+/);
   let wasCorrected = false;
@@ -313,7 +313,9 @@ function correctMisspelling(text) {
  * @returns {{ canonical: string, display: string, distance: number, correctedFrom?: string } | null}
  */
 function fuzzyMatchIngredientFamily(text) {
-  if (!text || text.length < 4) return null; // Don't fuzzy match very short strings
+  if (!text || text.length < 4) {
+    return null; // Don't fuzzy match very short strings
+  }
 
   // Step 1: Try to correct common misspellings (high confidence)
   const { corrected, wasCorrected } = correctMisspelling(text);
@@ -338,7 +340,9 @@ function fuzzyMatchIngredientFamily(text) {
   // Step 2: Conservative Levenshtein matching
   // Only use for longer words (6+ chars) with distance of exactly 1
   // This avoids false positives like "berries" → "cherries"
-  if (text.length < 6) return null;
+  if (text.length < 6) {
+    return null;
+  }
 
   const canonicalNames = new Set();
   for (const mapping of INGREDIENT_FAMILY_MAP) {
