@@ -139,6 +139,10 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          DB_HOST: ${{ secrets.DB_HOST }}
+          DB_PORT: ${{ secrets.DB_PORT }}
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
           set -e
@@ -161,11 +165,12 @@ jobs:
           # Create/update environment file
           echo "🔧 Updating environment configuration..."
           cat > .env << EOF
-          DB_HOST=db
-          DB_PORT=5432
-          DB_NAME=recipeapp
-          DB_USER=recipeuser
+          DB_HOST=${DB_HOST}
+          DB_PORT=${DB_PORT}
+          DB_NAME=${DB_NAME}
+          DB_USER=${DB_USER}
           DB_PASSWORD=${DB_PASSWORD}
+          DB_SSL=true
           JWT_SECRET=${JWT_SECRET}
           ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
           NODE_ENV=production
@@ -176,8 +181,8 @@ jobs:
 
           # Stop existing containers
           echo "🛑 Stopping existing containers..."
-          docker stop recipe-app-backend recipe-app-frontend recipe-app-db 2>/dev/null || true
-          docker rm recipe-app-backend recipe-app-frontend recipe-app-db 2>/dev/null || true
+          docker stop recipe-app-backend recipe-app-frontend 2>/dev/null || true
+          docker rm recipe-app-backend recipe-app-frontend 2>/dev/null || true
 
           # Clean up old images to save space
           echo "🧹 Cleaning up old Docker images..."
@@ -200,37 +205,17 @@ jobs:
           echo "🔗 Creating Docker network..."
           docker network create recipes_default 2>/dev/null || true
 
-          # Create volume if it doesn't exist
-          echo "💾 Creating PostgreSQL volume..."
-          docker volume create recipes_postgres_data 2>/dev/null || true
-
-          # Start database
-          echo "🚀 Starting PostgreSQL database..."
-          docker run -d \
-            --name recipe-app-db \
-            --network recipes_default \
-            -e POSTGRES_DB=recipeapp \
-            -e POSTGRES_USER=recipeuser \
-            -e POSTGRES_PASSWORD=${DB_PASSWORD} \
-            -v recipes_postgres_data:/var/lib/postgresql/data \
-            -p 5432:5432 \
-            --restart unless-stopped \
-            postgres:15-alpine
-
-          # Wait for database to be ready
-          echo "⏳ Waiting for database to be ready..."
-          sleep 10
-
           # Start backend
           echo "🚀 Starting backend service..."
           docker run -d \
             --name recipe-app-backend \
             --network recipes_default \
-            -e DB_HOST=recipe-app-db \
-            -e DB_PORT=5432 \
-            -e DB_NAME=recipeapp \
-            -e DB_USER=recipeuser \
+            -e DB_HOST=${DB_HOST} \
+            -e DB_PORT=${DB_PORT} \
+            -e DB_NAME=${DB_NAME} \
+            -e DB_USER=${DB_USER} \
             -e DB_PASSWORD=${DB_PASSWORD} \
+            -e DB_SSL=true \
             -e JWT_SECRET=${JWT_SECRET} \
             -e ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY} \
             -e NODE_ENV=production \
